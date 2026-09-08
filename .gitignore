@@ -34,3 +34,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local coding-agent context
+/AGENTS.md
+/.agent/
