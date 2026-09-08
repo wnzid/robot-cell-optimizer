@@ -1,0 +1,36 @@
+# ROS 2 / colcon
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# CMake
+build/
+cmake-build-*/
+
+# C/C++
+*.o
+*.a
+*.so
+*.out
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# VS Code / IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

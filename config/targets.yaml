@@ -1,0 +1,22 @@
+targets:
+  - id: 1
+    position:
+      x: 0.50
+      y: 0.20
+      z: 0.70
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+
+  - id: 2
+    position:
+      x: 1.50
+      y: 0.40
+      z: 0.90
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
