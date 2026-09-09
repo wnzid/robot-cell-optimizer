@@ -28,9 +28,12 @@ find_package(sensor_msgs REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 add_library(rco_core
   src/robot_model_context.cpp
+  src/domain/serialization.cpp
+  src/domain/validation.cpp
 )
 
 target_include_directories(rco_core
@@ -49,6 +52,7 @@ ament_target_dependencies(rco_core
 
 target_link_libraries(rco_core
   Eigen3::Eigen
+  yaml-cpp::yaml-cpp
 )
 
 add_executable(robot_diagnostics
@@ -84,6 +88,7 @@ ament_export_dependencies(
   moveit_core
   moveit_ros_planning
   Eigen3
+  yaml-cpp
 )
 
 if(BUILD_TESTING)
@@ -106,6 +111,22 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_toolchain
     test/test_toolchain.cpp
+  )
+
+  ament_add_gtest(test_domain_validation
+    test/domain/test_validation.cpp
+  )
+
+  target_link_libraries(test_domain_validation
+    rco_core
+  )
+
+  ament_add_gtest(test_domain_serialization
+    test/domain/test_serialization.cpp
+  )
+
+  target_link_libraries(test_domain_serialization
+    rco_core
   )
 
   target_link_libraries(test_toolchain
