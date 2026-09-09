@@ -3,6 +3,7 @@
 #include "rco_core/domain/validation.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <gtest/gtest.h>
 #include <limits>
@@ -16,9 +17,13 @@ using rco_core::domain::CellEntityType;
 using rco_core::domain::GeometryDefinition;
 using rco_core::domain::GeometryType;
 using rco_core::domain::JointLimits;
+using rco_core::domain::OptimizationProblem;
 using rco_core::domain::Pose;
+using rco_core::domain::ProcessSegment;
+using rco_core::domain::ProcessSegmentType;
 using rco_core::domain::RobotDefinition;
 using rco_core::domain::StudyDefinition;
+using rco_core::domain::TargetPose;
 using rco_core::domain::TaskDefinition;
 using rco_core::domain::ToolDefinition;
 using rco_core::domain::ValidationErrors;
@@ -68,6 +73,11 @@ CellDefinition makeValidCell() {
 TaskDefinition makeValidTask() {
   TaskDefinition task;
   task.id = "task_1";
+  ProcessSegment segment;
+  segment.type = ProcessSegmentType::kProcess;
+  segment.targets.push_back(TargetPose{makeValidPose("world")});
+  segment.tcp_speed_mps = 0.25;
+  task.segments.push_back(segment);
   return task;
 }
 
@@ -276,6 +286,74 @@ TEST(DomainValidationTest, RejectsDuplicateCellEntityIds) {
   const auto errors = rco_core::domain::validate(cell);
 
   EXPECT_TRUE(containsPath(errors, ".entities[1].id"));
+}
+
+TEST(DomainValidationTest, AcceptsEveryProcessSegmentType) {
+  const std::array types{ProcessSegmentType::kProcess, ProcessSegmentType::kApproach,
+                         ProcessSegmentType::kRetract, ProcessSegmentType::kTransition};
+
+  for (const auto type : types) {
+    ProcessSegment segment;
+    segment.type = type;
+    segment.targets.push_back(TargetPose{makeValidPose("world")});
+    segment.tcp_speed_mps = 0.25;
+
+    EXPECT_TRUE(rco_core::domain::validate(segment).empty());
+  }
+}
+
+TEST(DomainValidationTest, RejectsTaskWithoutSegments) {
+  auto task = makeValidTask();
+  task.segments.clear();
+
+  const auto errors = rco_core::domain::validate(task);
+
+  EXPECT_TRUE(containsPath(errors, ".segments"));
+}
+
+TEST(DomainValidationTest, RejectsSegmentWithoutTargets) {
+  auto task = makeValidTask();
+  task.segments.front().targets.clear();
+
+  const auto errors = rco_core::domain::validate(task);
+
+  EXPECT_TRUE(containsPath(errors, ".segments[0].targets"));
+}
+
+TEST(DomainValidationTest, RejectsNonPositiveSegmentSpeed) {
+  auto task = makeValidTask();
+  task.segments.front().tcp_speed_mps = 0.0;
+
+  const auto errors = rco_core::domain::validate(task);
+
+  EXPECT_TRUE(containsPath(errors, ".segments[0].tcp_speed_mps"));
+}
+
+TEST(DomainValidationTest, ReportsNestedTargetPosePath) {
+  auto task = makeValidTask();
+  task.segments.front().targets.front().pose.frame_id.clear();
+
+  const auto errors = rco_core::domain::validate(task);
+
+  EXPECT_TRUE(containsPath(errors, ".segments[0].targets[0].pose.frame_id"));
+}
+
+TEST(DomainValidationTest, RejectsZeroEvaluationBudget) {
+  OptimizationProblem optimization;
+  optimization.evaluation_budget = 0U;
+
+  const auto errors = rco_core::domain::validate(optimization);
+
+  EXPECT_TRUE(containsPath(errors, ".evaluation_budget"));
+}
+
+TEST(DomainValidationTest, ReportsNestedStudyOptimizationPath) {
+  auto study = makeValidStudy();
+  study.optimization.evaluation_budget = 0U;
+
+  const auto errors = rco_core::domain::validate(study);
+
+  EXPECT_TRUE(containsPath(errors, ".optimization.evaluation_budget"));
 }
 
 } // namespace

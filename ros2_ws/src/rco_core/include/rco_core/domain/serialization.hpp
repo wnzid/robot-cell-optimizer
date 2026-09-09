@@ -59,6 +59,33 @@ struct CellYamlParseResult {
   }
 };
 
+struct TaskYamlParseResult {
+  std::optional<TaskDefinition> value;
+  ValidationErrors errors;
+
+  [[nodiscard]] bool ok() const noexcept {
+    return value.has_value();
+  }
+};
+
+struct OptimizationYamlParseResult {
+  std::optional<OptimizationProblem> value;
+  ValidationErrors errors;
+
+  [[nodiscard]] bool ok() const noexcept {
+    return value.has_value();
+  }
+};
+
+struct StudyYamlParseResult {
+  std::optional<StudyDefinition> value;
+  ValidationErrors errors;
+
+  [[nodiscard]] bool ok() const noexcept {
+    return value.has_value();
+  }
+};
+
 // NOLINTEND(misc-non-private-member-variables-in-classes)
 
 [[nodiscard]] PoseYamlParseResult parsePoseYaml(std::string_view yaml_text);
@@ -71,6 +98,12 @@ struct CellYamlParseResult {
 
 [[nodiscard]] CellYamlParseResult parseCellYaml(std::string_view yaml_text);
 
+[[nodiscard]] TaskYamlParseResult parseTaskYaml(std::string_view yaml_text);
+
+[[nodiscard]] OptimizationYamlParseResult parseOptimizationYaml(std::string_view yaml_text);
+
+[[nodiscard]] StudyYamlParseResult parseStudyYaml(std::string_view yaml_text);
+
 // Keys are emitted in schema order and floating-point values use enough
 // precision for an exact parse/serialize round trip.
 [[nodiscard]] std::string serializePoseYaml(const Pose& pose);
@@ -82,5 +115,11 @@ struct CellYamlParseResult {
 [[nodiscard]] std::string serializeToolYaml(const ToolDefinition& tool);
 
 [[nodiscard]] std::string serializeCellYaml(const CellDefinition& cell);
+
+[[nodiscard]] std::string serializeTaskYaml(const TaskDefinition& task);
+
+[[nodiscard]] std::string serializeOptimizationYaml(const OptimizationProblem& optimization);
+
+[[nodiscard]] std::string serializeStudyYaml(const StudyDefinition& study);
 
 } // namespace rco_core::domain

@@ -31,7 +31,13 @@ using ValidationErrors = std::vector<ValidationError>;
 
 [[nodiscard]] ValidationErrors validate(const CellDefinition& cell);
 
+[[nodiscard]] ValidationErrors validate(const TargetPose& target);
+
+[[nodiscard]] ValidationErrors validate(const ProcessSegment& segment);
+
 [[nodiscard]] ValidationErrors validate(const TaskDefinition& task);
+
+[[nodiscard]] ValidationErrors validate(const OptimizationProblem& optimization);
 
 [[nodiscard]] ValidationErrors validate(const StudyDefinition& study);
 

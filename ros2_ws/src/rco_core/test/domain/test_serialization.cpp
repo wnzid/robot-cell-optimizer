@@ -20,10 +20,19 @@ using rco_core::domain::GeometryDefinition;
 using rco_core::domain::GeometryType;
 using rco_core::domain::GeometryYamlParseResult;
 using rco_core::domain::JointLimits;
+using rco_core::domain::OptimizationProblem;
+using rco_core::domain::OptimizationYamlParseResult;
 using rco_core::domain::Pose;
 using rco_core::domain::PoseYamlParseResult;
+using rco_core::domain::ProcessSegment;
+using rco_core::domain::ProcessSegmentType;
 using rco_core::domain::RobotDefinition;
 using rco_core::domain::RobotYamlParseResult;
+using rco_core::domain::StudyDefinition;
+using rco_core::domain::StudyYamlParseResult;
+using rco_core::domain::TargetPose;
+using rco_core::domain::TaskDefinition;
+using rco_core::domain::TaskYamlParseResult;
 using rco_core::domain::ToolDefinition;
 using rco_core::domain::ToolYamlParseResult;
 using rco_core::domain::ValidationErrors;
@@ -80,6 +89,40 @@ CellDefinition makeCell() {
   fixture.geometry.size_m = {0.5, 0.25, 0.1};
   cell.entities.push_back(fixture);
   return cell;
+}
+
+TaskDefinition makeTask() {
+  TaskDefinition task;
+  task.id = "task_1";
+
+  const std::array types{ProcessSegmentType::kProcess, ProcessSegmentType::kApproach,
+                         ProcessSegmentType::kRetract, ProcessSegmentType::kTransition};
+  for (const auto type : types) {
+    ProcessSegment segment;
+    segment.type = type;
+    segment.targets.push_back(TargetPose{makePose()});
+    segment.tcp_speed_mps = 0.25;
+    task.segments.push_back(segment);
+  }
+  return task;
+}
+
+OptimizationProblem makeOptimization() {
+  OptimizationProblem optimization;
+  optimization.evaluation_budget = 2500U;
+  optimization.random_seed = 42U;
+  return optimization;
+}
+
+StudyDefinition makeStudy() {
+  StudyDefinition study;
+  study.id = "study_1";
+  study.robot = makeRobot();
+  study.tool = makeTool();
+  study.cell = makeCell();
+  study.task = makeTask();
+  study.optimization = makeOptimization();
+  return study;
 }
 
 bool containsError(const ValidationErrors& errors, const std::string& path,
@@ -430,6 +473,206 @@ TEST(DomainSerializationTest, RejectsNonSequenceCellEntities) {
 
   EXPECT_FALSE(result.ok());
   EXPECT_TRUE(containsError(result.errors, ".entities", "must be a sequence"));
+}
+
+TEST(DomainSerializationTest, RoundTripsTaskWithEverySegmentType) {
+  const TaskDefinition task = makeTask();
+
+  const std::string yaml = rco_core::domain::serializeTaskYaml(task);
+  const TaskYamlParseResult result = rco_core::domain::parseTaskYaml(yaml);
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value, std::optional<TaskDefinition>{task});
+  EXPECT_TRUE(result.errors.empty());
+  EXPECT_NE(yaml.find("type: process"), std::string::npos);
+  EXPECT_NE(yaml.find("type: approach"), std::string::npos);
+  EXPECT_NE(yaml.find("type: retract"), std::string::npos);
+  EXPECT_NE(yaml.find("type: transition"), std::string::npos);
+}
+
+TEST(DomainSerializationTest, EmitsTaskKeysInDeterministicSchemaOrder) {
+  auto task = makeTask();
+  task.segments.resize(1);
+
+  const std::string yaml = rco_core::domain::serializeTaskYaml(task);
+
+  EXPECT_EQ(yaml, R"(id: task_1
+segments:
+  - type: process
+    targets:
+      - pose:
+          frame_id: world
+          position:
+            x: 1.25
+            y: -0.5
+            z: 0.125
+          orientation:
+            x: 0.5
+            y: -0.5
+            z: 0.5
+            w: -0.5
+    tcp_speed_mps: 0.25)");
+}
+
+TEST(DomainSerializationTest, RejectsUnknownProcessSegmentTypeWithIndexedPath) {
+  std::string yaml = rco_core::domain::serializeTaskYaml(makeTask());
+  const std::size_t type_position = yaml.find("type: process");
+  yaml.replace(type_position, std::string("type: process").size(), "type: dwell");
+
+  const TaskYamlParseResult result = rco_core::domain::parseTaskYaml(yaml);
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".segments[0].type",
+                            "must be one of: process, approach, retract, transition"));
+}
+
+TEST(DomainSerializationTest, RejectsNonSequenceTaskSegments) {
+  const TaskYamlParseResult result = rco_core::domain::parseTaskYaml("id: task_1\nsegments: {}");
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".segments", "must be a sequence"));
+}
+
+TEST(DomainSerializationTest, RejectsNonSequenceSegmentTargets) {
+  std::string yaml = rco_core::domain::serializeTaskYaml(makeTask());
+  const std::size_t targets_position = yaml.find("targets:");
+  const std::size_t speed_position = yaml.find("    tcp_speed_mps:", targets_position);
+  yaml.replace(targets_position, speed_position - targets_position, "targets: {}\n");
+
+  const TaskYamlParseResult result = rco_core::domain::parseTaskYaml(yaml);
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".segments[0].targets", "must be a sequence"));
+}
+
+TEST(DomainSerializationTest, AppliesSegmentValidationAfterParsing) {
+  auto task = makeTask();
+  task.segments.front().tcp_speed_mps = 0.0;
+
+  const TaskYamlParseResult result =
+      rco_core::domain::parseTaskYaml(rco_core::domain::serializeTaskYaml(task));
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".segments[0].tcp_speed_mps",
+                            "must be a finite SI value greater than zero"));
+}
+
+TEST(DomainSerializationTest, ReportsNestedTaskTargetPosePath) {
+  auto task = makeTask();
+  task.segments.front().targets.front().pose.frame_id.clear();
+
+  const TaskYamlParseResult result =
+      rco_core::domain::parseTaskYaml(rco_core::domain::serializeTaskYaml(task));
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(
+      containsError(result.errors, ".segments[0].targets[0].pose.frame_id", "must not be empty"));
+}
+
+TEST(DomainSerializationTest, RoundTripsOptimizationExactly) {
+  const OptimizationProblem optimization = makeOptimization();
+
+  const std::string yaml = rco_core::domain::serializeOptimizationYaml(optimization);
+  const OptimizationYamlParseResult result = rco_core::domain::parseOptimizationYaml(yaml);
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value, std::optional<OptimizationProblem>{optimization});
+  EXPECT_TRUE(result.errors.empty());
+}
+
+TEST(DomainSerializationTest, EmitsOptimizationKeysInDeterministicSchemaOrder) {
+  const std::string yaml = rco_core::domain::serializeOptimizationYaml(makeOptimization());
+
+  EXPECT_EQ(yaml, R"(evaluation_budget: 2500
+random_seed: 42)");
+}
+
+TEST(DomainSerializationTest, RejectsNonIntegerOptimizationValue) {
+  const OptimizationYamlParseResult result =
+      rco_core::domain::parseOptimizationYaml("evaluation_budget: many\nrandom_seed: 42");
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".evaluation_budget", "must be a non-negative integer"));
+}
+
+TEST(DomainSerializationTest, RejectsNegativeRandomSeed) {
+  const OptimizationYamlParseResult result =
+      rco_core::domain::parseOptimizationYaml("evaluation_budget: 2500\nrandom_seed: -1");
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".random_seed", "must be a non-negative integer"));
+}
+
+TEST(DomainSerializationTest, AppliesOptimizationValidationAfterParsing) {
+  const OptimizationYamlParseResult result =
+      rco_core::domain::parseOptimizationYaml("evaluation_budget: 0\nrandom_seed: 42");
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".evaluation_budget", "must be greater than zero"));
+}
+
+TEST(DomainSerializationTest, RoundTripsCompleteStudyExactly) {
+  const StudyDefinition study = makeStudy();
+
+  const std::string yaml = rco_core::domain::serializeStudyYaml(study);
+  const StudyYamlParseResult result = rco_core::domain::parseStudyYaml(yaml);
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value, std::optional<StudyDefinition>{study});
+  EXPECT_TRUE(result.errors.empty());
+}
+
+TEST(DomainSerializationTest, EmitsStudySectionsInDeterministicSchemaOrder) {
+  const std::string yaml = rco_core::domain::serializeStudyYaml(makeStudy());
+
+  const std::size_t schema_position = yaml.find("schema_version:");
+  const std::size_t id_position = yaml.find("id:");
+  const std::size_t robot_position = yaml.find("robot:");
+  const std::size_t tool_position = yaml.find("tool:");
+  const std::size_t cell_position = yaml.find("cell:");
+  const std::size_t task_position = yaml.find("task:");
+  const std::size_t optimization_position = yaml.find("optimization:");
+
+  EXPECT_LT(schema_position, id_position);
+  EXPECT_LT(id_position, robot_position);
+  EXPECT_LT(robot_position, tool_position);
+  EXPECT_LT(tool_position, cell_position);
+  EXPECT_LT(cell_position, task_position);
+  EXPECT_LT(task_position, optimization_position);
+}
+
+TEST(DomainSerializationTest, PrefixesNestedStudyErrors) {
+  std::string yaml = rco_core::domain::serializeStudyYaml(makeStudy());
+  const std::string needle = "  model: ur5e\n";
+  yaml.insert(yaml.find(needle) + needle.size(), "  legacy_name: old\n");
+
+  const StudyYamlParseResult result = rco_core::domain::parseStudyYaml(yaml);
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".robot.legacy_name", "unknown key"));
+}
+
+TEST(DomainSerializationTest, RejectsNonMappingStudySectionWithExactPath) {
+  std::string yaml = rco_core::domain::serializeStudyYaml(makeStudy());
+  const std::size_t robot_position = yaml.find("robot:");
+  const std::size_t tool_position = yaml.find("tool:", robot_position);
+  yaml.replace(robot_position, tool_position - robot_position, "robot: invalid\n");
+
+  const StudyYamlParseResult result = rco_core::domain::parseStudyYaml(yaml);
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".robot", "must be a mapping"));
+}
+
+TEST(DomainSerializationTest, AppliesStudySchemaVersionValidation) {
+  auto study = makeStudy();
+  study.schema_version = 999U;
+
+  const StudyYamlParseResult result =
+      rco_core::domain::parseStudyYaml(rco_core::domain::serializeStudyYaml(study));
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".schema_version", "unsupported study schema version"));
 }
 
 } // namespace

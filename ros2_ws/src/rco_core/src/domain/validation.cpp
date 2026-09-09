@@ -289,6 +289,45 @@ ValidationErrors validate(const CellDefinition& cell) {
   return errors;
 }
 
+ValidationErrors validate(const TargetPose& target) {
+  ValidationErrors errors;
+  appendErrors(errors, validate(target.pose), ".pose");
+  return errors;
+}
+
+ValidationErrors validate(const ProcessSegment& segment) {
+  ValidationErrors errors;
+
+  switch (segment.type) {
+  case ProcessSegmentType::kProcess:
+  case ProcessSegmentType::kApproach:
+  case ProcessSegmentType::kRetract:
+  case ProcessSegmentType::kTransition:
+    break;
+  default:
+    errors.push_back({".type", "unsupported process segment type"});
+    break;
+  }
+
+  if (segment.targets.empty()) {
+    errors.push_back({".targets", "must contain at least one target"});
+  }
+
+  if (!isFinite(segment.tcp_speed_mps) || segment.tcp_speed_mps <= 0.0) {
+    errors.push_back({
+        ".tcp_speed_mps",
+        "must be a finite SI value greater than zero",
+    });
+  }
+
+  for (std::size_t index = 0; index < segment.targets.size(); ++index) {
+    appendErrors(errors, validate(segment.targets[index]),
+                 ".targets[" + std::to_string(index) + "]");
+  }
+
+  return errors;
+}
+
 ValidationErrors validate(const TaskDefinition& task) {
   ValidationErrors errors;
 
@@ -296,14 +335,23 @@ ValidationErrors validate(const TaskDefinition& task) {
     errors.push_back({".id", "must not be empty"});
   }
 
-  for (std::size_t segment_index = 0; segment_index < task.segments.size(); ++segment_index) {
-    const auto& segment = task.segments[segment_index];
+  if (task.segments.empty()) {
+    errors.push_back({".segments", "must contain at least one segment"});
+  }
 
-    for (std::size_t target_index = 0; target_index < segment.targets.size(); ++target_index) {
-      appendErrors(errors, validate(segment.targets[target_index].pose),
-                   ".segments[" + std::to_string(segment_index) + "].targets[" +
-                       std::to_string(target_index) + "].pose");
-    }
+  for (std::size_t segment_index = 0; segment_index < task.segments.size(); ++segment_index) {
+    appendErrors(errors, validate(task.segments[segment_index]),
+                 ".segments[" + std::to_string(segment_index) + "]");
+  }
+
+  return errors;
+}
+
+ValidationErrors validate(const OptimizationProblem& optimization) {
+  ValidationErrors errors;
+
+  if (optimization.evaluation_budget == 0U) {
+    errors.push_back({".evaluation_budget", "must be greater than zero"});
   }
 
   return errors;
@@ -330,6 +378,8 @@ ValidationErrors validate(const StudyDefinition& study) {
   appendErrors(errors, validate(study.cell), ".cell");
 
   appendErrors(errors, validate(study.task), ".task");
+
+  appendErrors(errors, validate(study.optimization), ".optimization");
 
   return errors;
 }

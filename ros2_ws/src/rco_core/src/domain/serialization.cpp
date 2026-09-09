@@ -20,7 +20,8 @@
 #include <yaml-cpp/node/convert.h>     // IWYU pragma: keep
 #include <yaml-cpp/node/detail/impl.h> // IWYU pragma: keep
 #include <yaml-cpp/node/detail/node.h> // IWYU pragma: keep
-#include <yaml-cpp/node/impl.h>        // IWYU pragma: keep
+#include <yaml-cpp/node/emit.h>
+#include <yaml-cpp/node/impl.h> // IWYU pragma: keep
 #include <yaml-cpp/node/iterator.h>
 #include <yaml-cpp/node/node.h>
 #include <yaml-cpp/node/parse.h>
@@ -32,6 +33,14 @@ using KeyList = std::span<const std::string_view>;
 
 void addError(ValidationErrors& errors, std::string path, std::string message) {
   errors.push_back({std::move(path), std::move(message)});
+}
+
+void appendPrefixedErrors(ValidationErrors& destination, ValidationErrors source,
+                          std::string_view prefix) {
+  for (auto& error : source) {
+    error.path = std::string(prefix) + error.path;
+    destination.push_back(std::move(error));
+  }
 }
 
 bool isAllowedKey(std::string_view key, KeyList allowed_keys) {
@@ -103,6 +112,30 @@ bool readRequiredDouble(const YAML::Node& parent, std::string_view key, double& 
     output = node.as<double>();
   } catch (const YAML::Exception&) {
     addError(errors, std::string(path), "must be a number");
+    return false;
+  }
+
+  return true;
+}
+
+template <typename Value>
+bool readRequiredUnsignedInteger(const YAML::Node& parent, std::string_view key, Value& output,
+                                 std::string_view path, ValidationErrors& errors) {
+  const YAML::Node node = parent[std::string(key)];
+  if (!node) {
+    addError(errors, std::string(path), "missing required key");
+    return false;
+  }
+
+  if (!node.IsScalar()) {
+    addError(errors, std::string(path), "must be a non-negative integer");
+    return false;
+  }
+
+  try {
+    output = node.as<Value>();
+  } catch (const YAML::Exception&) {
+    addError(errors, std::string(path), "must be a non-negative integer");
     return false;
   }
 
@@ -438,6 +471,201 @@ void emitJointLimits(YAML::Emitter& emitter, const std::vector<JointLimits>& joi
   emitter << YAML::EndSeq;
 }
 
+std::string_view processSegmentTypeYamlName(ProcessSegmentType type) {
+  switch (type) {
+  case ProcessSegmentType::kProcess:
+    return "process";
+  case ProcessSegmentType::kApproach:
+    return "approach";
+  case ProcessSegmentType::kRetract:
+    return "retract";
+  case ProcessSegmentType::kTransition:
+    return "transition";
+  }
+  return "unknown";
+}
+
+bool parseProcessSegmentType(std::string_view text, ProcessSegmentType& output) {
+  if (text == "process") {
+    output = ProcessSegmentType::kProcess;
+    return true;
+  }
+  if (text == "approach") {
+    output = ProcessSegmentType::kApproach;
+    return true;
+  }
+  if (text == "retract") {
+    output = ProcessSegmentType::kRetract;
+    return true;
+  }
+  if (text == "transition") {
+    output = ProcessSegmentType::kTransition;
+    return true;
+  }
+  return false;
+}
+
+void readTargetPose(const YAML::Node& node, std::string_view path, TargetPose& output,
+                    ValidationErrors& errors) {
+  if (!requireMapping(node, path, errors)) {
+    return;
+  }
+
+  constexpr std::array<std::string_view, 1> kKeys{"pose"};
+  checkMappingKeys(node, path, kKeys, errors);
+
+  const YAML::Node pose = node["pose"];
+  if (!pose) {
+    addError(errors, std::string(path) + ".pose", "missing required key");
+  } else {
+    readPose(pose, std::string(path) + ".pose", output.pose, errors);
+  }
+}
+
+void emitTargetPose(YAML::Emitter& emitter, const TargetPose& target) {
+  emitter << YAML::BeginMap << YAML::Key << "pose" << YAML::Value;
+  emitPose(emitter, target.pose);
+  emitter << YAML::EndMap;
+}
+
+void readProcessSegment(const YAML::Node& node, std::string_view path, ProcessSegment& output,
+                        ValidationErrors& errors) {
+  if (!requireMapping(node, path, errors)) {
+    return;
+  }
+
+  constexpr std::array<std::string_view, 3> kKeys{"type", "targets", "tcp_speed_mps"};
+  checkMappingKeys(node, path, kKeys, errors);
+
+  std::string type_name;
+  const bool has_type =
+      readRequiredString(node, "type", type_name, std::string(path) + ".type", errors);
+  if (has_type && !parseProcessSegmentType(type_name, output.type)) {
+    addError(errors, std::string(path) + ".type",
+             "must be one of: process, approach, retract, transition");
+  }
+
+  const YAML::Node targets = node["targets"];
+  if (!targets) {
+    addError(errors, std::string(path) + ".targets", "missing required key");
+  } else if (!targets.IsSequence()) {
+    addError(errors, std::string(path) + ".targets", "must be a sequence");
+  } else {
+    output.targets.reserve(targets.size());
+    for (std::size_t index = 0; index < targets.size(); ++index) {
+      TargetPose target;
+      readTargetPose(targets[index], std::string(path) + ".targets[" + std::to_string(index) + "]",
+                     target, errors);
+      output.targets.push_back(std::move(target));
+    }
+  }
+
+  static_cast<void>(readRequiredDouble(node, "tcp_speed_mps", output.tcp_speed_mps,
+                                       std::string(path) + ".tcp_speed_mps", errors));
+}
+
+void emitProcessSegment(YAML::Emitter& emitter, const ProcessSegment& segment) {
+  emitter << YAML::BeginMap << YAML::Key << "type" << YAML::Value
+          << std::string(processSegmentTypeYamlName(segment.type)) << YAML::Key << "targets"
+          << YAML::Value << YAML::BeginSeq;
+  for (const auto& target : segment.targets) {
+    emitTargetPose(emitter, target);
+  }
+  emitter << YAML::EndSeq << YAML::Key << "tcp_speed_mps" << YAML::Value << segment.tcp_speed_mps
+          << YAML::EndMap;
+}
+
+void readStudyRobot(const YAML::Node& root, StudyDefinition& study, ValidationErrors& errors) {
+  const YAML::Node node = root["robot"];
+  if (!node) {
+    addError(errors, ".robot", "missing required key");
+    return;
+  }
+  if (!requireMapping(node, ".robot", errors)) {
+    return;
+  }
+
+  RobotYamlParseResult result = parseRobotYaml(YAML::Dump(node));
+  if (!result.value.has_value()) {
+    appendPrefixedErrors(errors, std::move(result.errors), ".robot");
+    return;
+  }
+  study.robot = std::move(result.value).value();
+}
+
+void readStudyTool(const YAML::Node& root, StudyDefinition& study, ValidationErrors& errors) {
+  const YAML::Node node = root["tool"];
+  if (!node) {
+    addError(errors, ".tool", "missing required key");
+    return;
+  }
+  if (!requireMapping(node, ".tool", errors)) {
+    return;
+  }
+
+  ToolYamlParseResult result = parseToolYaml(YAML::Dump(node));
+  if (!result.value.has_value()) {
+    appendPrefixedErrors(errors, std::move(result.errors), ".tool");
+    return;
+  }
+  study.tool = std::move(result.value).value();
+}
+
+void readStudyCell(const YAML::Node& root, StudyDefinition& study, ValidationErrors& errors) {
+  const YAML::Node node = root["cell"];
+  if (!node) {
+    addError(errors, ".cell", "missing required key");
+    return;
+  }
+  if (!requireMapping(node, ".cell", errors)) {
+    return;
+  }
+
+  CellYamlParseResult result = parseCellYaml(YAML::Dump(node));
+  if (!result.value.has_value()) {
+    appendPrefixedErrors(errors, std::move(result.errors), ".cell");
+    return;
+  }
+  study.cell = std::move(result.value).value();
+}
+
+void readStudyTask(const YAML::Node& root, StudyDefinition& study, ValidationErrors& errors) {
+  const YAML::Node node = root["task"];
+  if (!node) {
+    addError(errors, ".task", "missing required key");
+    return;
+  }
+  if (!requireMapping(node, ".task", errors)) {
+    return;
+  }
+
+  TaskYamlParseResult result = parseTaskYaml(YAML::Dump(node));
+  if (!result.value.has_value()) {
+    appendPrefixedErrors(errors, std::move(result.errors), ".task");
+    return;
+  }
+  study.task = std::move(result.value).value();
+}
+
+void readStudyOptimization(const YAML::Node& root, StudyDefinition& study,
+                           ValidationErrors& errors) {
+  const YAML::Node node = root["optimization"];
+  if (!node) {
+    addError(errors, ".optimization", "missing required key");
+    return;
+  }
+  if (!requireMapping(node, ".optimization", errors)) {
+    return;
+  }
+
+  OptimizationYamlParseResult result = parseOptimizationYaml(YAML::Dump(node));
+  if (!result.value.has_value()) {
+    appendPrefixedErrors(errors, std::move(result.errors), ".optimization");
+    return;
+  }
+  study.optimization = result.value.value();
+}
+
 } // namespace
 
 PoseYamlParseResult parsePoseYaml(std::string_view yaml_text) {
@@ -662,6 +890,117 @@ CellYamlParseResult parseCellYaml(std::string_view yaml_text) {
   return {std::move(cell), {}};
 }
 
+TaskYamlParseResult parseTaskYaml(std::string_view yaml_text) {
+  YAML::Node root;
+  try {
+    root = YAML::Load(std::string(yaml_text));
+  } catch (const YAML::Exception& error) {
+    return {std::nullopt, {{"$", std::string("invalid YAML: ") + error.what()}}};
+  }
+
+  ValidationErrors errors;
+  if (!requireMapping(root, "$", errors)) {
+    return {std::nullopt, std::move(errors)};
+  }
+
+  constexpr std::array<std::string_view, 2> kKeys{"id", "segments"};
+  checkMappingKeys(root, "", kKeys, errors);
+
+  TaskDefinition task;
+  static_cast<void>(readRequiredString(root, "id", task.id, ".id", errors));
+
+  const YAML::Node segments = root["segments"];
+  if (!segments) {
+    addError(errors, ".segments", "missing required key");
+  } else if (!segments.IsSequence()) {
+    addError(errors, ".segments", "must be a sequence");
+  } else {
+    task.segments.reserve(segments.size());
+    for (std::size_t index = 0; index < segments.size(); ++index) {
+      ProcessSegment segment;
+      readProcessSegment(segments[index], ".segments[" + std::to_string(index) + "]", segment,
+                         errors);
+      task.segments.push_back(std::move(segment));
+    }
+  }
+
+  if (errors.empty()) {
+    errors = validate(task);
+  }
+  if (!errors.empty()) {
+    return {std::nullopt, std::move(errors)};
+  }
+  return {std::move(task), {}};
+}
+
+OptimizationYamlParseResult parseOptimizationYaml(std::string_view yaml_text) {
+  YAML::Node root;
+  try {
+    root = YAML::Load(std::string(yaml_text));
+  } catch (const YAML::Exception& error) {
+    return {std::nullopt, {{"$", std::string("invalid YAML: ") + error.what()}}};
+  }
+
+  ValidationErrors errors;
+  if (!requireMapping(root, "$", errors)) {
+    return {std::nullopt, std::move(errors)};
+  }
+
+  constexpr std::array<std::string_view, 2> kKeys{"evaluation_budget", "random_seed"};
+  checkMappingKeys(root, "", kKeys, errors);
+
+  OptimizationProblem optimization;
+  static_cast<void>(readRequiredUnsignedInteger(
+      root, "evaluation_budget", optimization.evaluation_budget, ".evaluation_budget", errors));
+  static_cast<void>(readRequiredUnsignedInteger(root, "random_seed", optimization.random_seed,
+                                                ".random_seed", errors));
+
+  if (errors.empty()) {
+    errors = validate(optimization);
+  }
+  if (!errors.empty()) {
+    return {std::nullopt, std::move(errors)};
+  }
+  return {optimization, {}};
+}
+
+StudyYamlParseResult parseStudyYaml(std::string_view yaml_text) {
+  YAML::Node root;
+  try {
+    root = YAML::Load(std::string(yaml_text));
+  } catch (const YAML::Exception& error) {
+    return {std::nullopt, {{"$", std::string("invalid YAML: ") + error.what()}}};
+  }
+
+  ValidationErrors errors;
+  if (!requireMapping(root, "$", errors)) {
+    return {std::nullopt, std::move(errors)};
+  }
+
+  constexpr std::array<std::string_view, 7> kKeys{"schema_version", "id",   "robot",       "tool",
+                                                  "cell",           "task", "optimization"};
+  checkMappingKeys(root, "", kKeys, errors);
+
+  StudyDefinition study;
+  static_cast<void>(readRequiredUnsignedInteger(root, "schema_version", study.schema_version,
+                                                ".schema_version", errors));
+  static_cast<void>(readRequiredString(root, "id", study.id, ".id", errors));
+
+  readStudyRobot(root, study, errors);
+  readStudyTool(root, study, errors);
+  readStudyCell(root, study, errors);
+  readStudyTask(root, study, errors);
+  readStudyOptimization(root, study, errors);
+
+  if (errors.empty()) {
+    errors = validate(study);
+  }
+  if (!errors.empty()) {
+    return {std::nullopt, std::move(errors)};
+  }
+  return {std::move(study), {}};
+}
+
 std::string serializePoseYaml(const Pose& pose) {
   YAML::Emitter emitter;
   emitter.SetDoublePrecision(static_cast<std::size_t>(std::numeric_limits<double>::max_digits10));
@@ -726,6 +1065,41 @@ std::string serializeCellYaml(const CellDefinition& cell) {
     emitCellEntity(emitter, entity);
   }
   emitter << YAML::EndSeq << YAML::EndMap;
+  return emitter.c_str();
+}
+
+std::string serializeTaskYaml(const TaskDefinition& task) {
+  YAML::Emitter emitter;
+  emitter.SetDoublePrecision(static_cast<std::size_t>(std::numeric_limits<double>::max_digits10));
+
+  emitter << YAML::BeginMap << YAML::Key << "id" << YAML::Value << task.id << YAML::Key
+          << "segments" << YAML::Value << YAML::BeginSeq;
+  for (const auto& segment : task.segments) {
+    emitProcessSegment(emitter, segment);
+  }
+  emitter << YAML::EndSeq << YAML::EndMap;
+  return emitter.c_str();
+}
+
+std::string serializeOptimizationYaml(const OptimizationProblem& optimization) {
+  YAML::Emitter emitter;
+  emitter << YAML::BeginMap << YAML::Key << "evaluation_budget" << YAML::Value
+          << optimization.evaluation_budget << YAML::Key << "random_seed" << YAML::Value
+          << optimization.random_seed << YAML::EndMap;
+  return emitter.c_str();
+}
+
+std::string serializeStudyYaml(const StudyDefinition& study) {
+  YAML::Emitter emitter;
+  emitter.SetDoublePrecision(static_cast<std::size_t>(std::numeric_limits<double>::max_digits10));
+
+  emitter << YAML::BeginMap << YAML::Key << "schema_version" << YAML::Value << study.schema_version
+          << YAML::Key << "id" << YAML::Value << study.id << YAML::Key << "robot" << YAML::Value
+          << YAML::Load(serializeRobotYaml(study.robot)) << YAML::Key << "tool" << YAML::Value
+          << YAML::Load(serializeToolYaml(study.tool)) << YAML::Key << "cell" << YAML::Value
+          << YAML::Load(serializeCellYaml(study.cell)) << YAML::Key << "task" << YAML::Value
+          << YAML::Load(serializeTaskYaml(study.task)) << YAML::Key << "optimization" << YAML::Value
+          << YAML::Load(serializeOptimizationYaml(study.optimization)) << YAML::EndMap;
   return emitter.c_str();
 }
 
