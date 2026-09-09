@@ -38,3 +38,11 @@ Thumbs.db
 # Local coding-agent context
 /AGENTS.md
 /.agent/
+
+# Sanitizer build artifacts
+/ros2_ws/build-sanitized/
+/ros2_ws/install-sanitized/
+/ros2_ws/log-sanitized/
+
+# Root colcon logs
+/log/
