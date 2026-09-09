@@ -26,7 +26,9 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(moveit_core REQUIRED)
+find_package(moveit_msgs REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
+find_package(shape_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
@@ -34,6 +36,7 @@ add_library(rco_core
   src/robot_model_context.cpp
   src/domain/serialization.cpp
   src/domain/validation.cpp
+  src/scene/collision_object.cpp
 )
 
 target_include_directories(rco_core
@@ -47,7 +50,9 @@ ament_target_dependencies(rco_core
   geometry_msgs
   sensor_msgs
   moveit_core
+  moveit_msgs
   moveit_ros_planning
+  shape_msgs
 )
 
 target_link_libraries(rco_core
@@ -86,7 +91,9 @@ ament_export_dependencies(
   geometry_msgs
   sensor_msgs
   moveit_core
+  moveit_msgs
   moveit_ros_planning
+  shape_msgs
   Eigen3
   yaml-cpp
 )
@@ -126,6 +133,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_domain_serialization
+    rco_core
+  )
+
+  ament_add_gtest(test_collision_object
+    test/scene/test_collision_object.cpp
+  )
+
+  target_link_libraries(test_collision_object
     rco_core
   )
 
