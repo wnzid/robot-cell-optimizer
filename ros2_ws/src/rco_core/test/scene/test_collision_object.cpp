@@ -9,6 +9,7 @@
 
 namespace {
 
+using rco_core::domain::CellDefinition;
 using rco_core::domain::CellEntity;
 using rco_core::domain::CellEntityType;
 using rco_core::domain::GeometryType;
@@ -22,6 +23,16 @@ CellEntity makeEntity(GeometryType geometry_type) {
   entity.pose.orientation.w = 1.0;
   entity.geometry.type = geometry_type;
   return entity;
+}
+
+CellDefinition makeCell() {
+  CellDefinition cell;
+  cell.id = "cell_1";
+  cell.robot_base.frame_id = "world";
+  cell.robot_base.orientation.w = 1.0;
+  cell.workpiece_pose.frame_id = "world";
+  cell.workpiece_pose.orientation.w = 1.0;
+  return cell;
 }
 
 TEST(CollisionObjectTest, ConvertsBoxWithPoseAndIdentity) {
@@ -88,6 +99,42 @@ TEST(CollisionObjectTest, DefersMeshGeometryExplicitly) {
   entity.geometry.mesh_uri = "package://rco_description/meshes/fixture.stl";
 
   EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObject(entity)),
+               std::invalid_argument);
+}
+
+TEST(CollisionObjectTest, ConvertsCellEntitiesInDefinitionOrder) {
+  auto cell = makeCell();
+  auto box = makeEntity(GeometryType::kBox);
+  box.id = "table_1";
+  box.type = CellEntityType::kTable;
+  box.geometry.size_m = {1.0, 0.5, 0.1};
+  auto sphere = makeEntity(GeometryType::kSphere);
+  sphere.id = "obstacle_1";
+  sphere.geometry.radius_m = 0.25;
+  cell.entities = {box, sphere};
+
+  const auto objects = rco_core::scene::makeCollisionObjects(cell);
+
+  ASSERT_EQ(objects.size(), 2U);
+  EXPECT_EQ(objects[0].id, "table_1");
+  EXPECT_EQ(objects[0].primitives.front().type, shape_msgs::msg::SolidPrimitive::BOX);
+  EXPECT_EQ(objects[1].id, "obstacle_1");
+  EXPECT_EQ(objects[1].primitives.front().type, shape_msgs::msg::SolidPrimitive::SPHERE);
+}
+
+TEST(CollisionObjectTest, ConvertsEmptyValidCellToEmptyList) {
+  const auto objects = rco_core::scene::makeCollisionObjects(makeCell());
+
+  EXPECT_TRUE(objects.empty());
+}
+
+TEST(CollisionObjectTest, RejectsInvalidCellBeforeConversion) {
+  auto cell = makeCell();
+  auto entity = makeEntity(GeometryType::kSphere);
+  entity.geometry.radius_m = 0.25;
+  cell.entities = {entity, entity};
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObjects(cell)),
                std::invalid_argument);
 }
 

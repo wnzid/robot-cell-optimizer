@@ -8,6 +8,7 @@
 #include <moveit_msgs/msg/collision_object.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <stdexcept>
+#include <vector>
 
 namespace rco_core::scene {
 namespace {
@@ -69,6 +70,22 @@ moveit_msgs::msg::CollisionObject makeCollisionObject(const domain::CellEntity& 
   object.primitive_poses.push_back(toRosPose(entity.pose));
   object.operation = moveit_msgs::msg::CollisionObject::ADD;
   return object;
+}
+
+std::vector<moveit_msgs::msg::CollisionObject>
+makeCollisionObjects(const domain::CellDefinition& cell) {
+  const domain::ValidationErrors errors = domain::validate(cell);
+  if (!errors.empty()) {
+    throw std::invalid_argument("Invalid cell definition" + errors.front().path + ": " +
+                                errors.front().message);
+  }
+
+  std::vector<moveit_msgs::msg::CollisionObject> objects;
+  objects.reserve(cell.entities.size());
+  for (const auto& entity : cell.entities) {
+    objects.push_back(makeCollisionObject(entity));
+  }
+  return objects;
 }
 
 } // namespace rco_core::scene
