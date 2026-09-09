@@ -39,11 +39,11 @@ jobs:
             clang-format \
             clang-tidy \
             lcov
-          rm -rf /var/lib/apt/lists/*
 
       - name: Install ROS dependencies
         shell: bash
         run: |
+          apt-get update
           rosdep update
           rosdep install \
             --from-paths ros2_ws/src \

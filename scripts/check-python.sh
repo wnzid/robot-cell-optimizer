@@ -12,20 +12,26 @@ fi
 
 cd "$ROOT/app/backend"
 
+run_clean() {
+  env -u PYTHONPATH "$@"
+}
+
 echo "=== Ruff lint ==="
-"$VENV/bin/ruff" check src tests
+run_clean "$VENV/bin/ruff" check src tests
 
 echo
 echo "=== Ruff format ==="
-"$VENV/bin/ruff" format --check src tests
+run_clean "$VENV/bin/ruff" format --check src tests
 
 echo
 echo "=== mypy ==="
-"$VENV/bin/mypy" src tests
+run_clean "$VENV/bin/mypy" src tests
 
 echo
 echo "=== pytest ==="
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$VENV/bin/pytest"
+env -u PYTHONPATH \
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+  "$VENV/bin/pytest"
 
 echo
 echo "Python quality checks passed."
