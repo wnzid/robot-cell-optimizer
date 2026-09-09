@@ -1,0 +1,32 @@
+minimum_pre_commit_version: "4.0.0"
+
+repos:
+  - repo: local
+    hooks:
+      - id: cpp-format
+        name: C++ formatting
+        entry: ./scripts/check-format.sh
+        language: system
+        pass_filenames: false
+        files: '^ros2_ws/src/.*\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$'
+
+      - id: python-quality
+        name: Python quality
+        entry: ./scripts/check-python.sh
+        language: system
+        pass_filenames: false
+        files: '^(app/backend/|scripts/(check-python|format-python)\.sh$)'
+
+      - id: frontend-quality
+        name: Frontend quality
+        entry: ./scripts/check-frontend.sh
+        language: system
+        pass_filenames: false
+        files: '^(app/frontend/|scripts/check-frontend\.sh$)'
+
+      - id: staged-whitespace
+        name: Staged whitespace
+        entry: bash -c 'git diff --cached --check'
+        language: system
+        pass_filenames: false
+        always_run: true

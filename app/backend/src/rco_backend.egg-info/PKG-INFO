@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: rco-backend
+Version: 0.1.0
+Summary: Application gateway for Robot Cell Optimizer.
+Requires-Python: >=3.12
+Provides-Extra: dev
+Requires-Dist: mypy>=1.15; extra == "dev"
+Requires-Dist: pre-commit>=4.3; extra == "dev"
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: ruff>=0.11; extra == "dev"

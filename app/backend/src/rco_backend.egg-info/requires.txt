@@ -1,0 +1,6 @@
+
+[dev]
+mypy>=1.15
+pre-commit>=4.3
+pytest>=8.3
+ruff>=0.11

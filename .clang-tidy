@@ -1,0 +1,30 @@
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-vararg,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -modernize-use-trailing-return-type
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '.*robot-cell-optimizer/ros2_ws/src/.*'
+
+FormatStyle: file
+
+CheckOptions:
+  misc-include-cleaner.IgnoreHeaders: 'Eigen/.*'
+  readability-function-cognitive-complexity.Threshold: '25'
+  readability-function-size.LineThreshold: '100'
+  readability-function-size.StatementThreshold: '60'

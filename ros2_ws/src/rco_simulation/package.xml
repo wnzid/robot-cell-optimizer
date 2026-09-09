@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"
+             schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rco_simulation</name>
+  <version>0.1.0</version>
+
+  <description>
+    Gazebo simulation, trajectory replay, and digital-twin validation integration
+    for Robot Cell Optimizer.
+  </description>
+
+  <maintainer email="183149325+wnzid@users.noreply.github.com">
+    Md Nahidul Islam
+  </maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rco_core</depend>
+
+  <exec_depend>ros_gz_bridge</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
