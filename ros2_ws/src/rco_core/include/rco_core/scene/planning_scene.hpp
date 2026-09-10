@@ -2,6 +2,7 @@
 
 #include "rco_core/domain/model.hpp"
 
+#include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
 
 namespace rco_core::scene {
@@ -10,5 +11,10 @@ namespace rco_core::scene {
 // Applying or publishing the diff belongs to a later ROS-facing increment.
 [[nodiscard]] moveit_msgs::msg::PlanningScene
 makePlanningSceneWorldDiff(const domain::CellDefinition& cell);
+
+// Applies the validated cell as a world diff to an in-memory MoveIt scene.
+// Returns MoveIt's application result; validation failures throw before mutation.
+[[nodiscard]] bool applyCellWorldDiff(planning_scene::PlanningScene& scene,
+                                      const domain::CellDefinition& cell);
 
 } // namespace rco_core::scene

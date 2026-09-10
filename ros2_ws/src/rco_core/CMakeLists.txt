@@ -151,6 +151,7 @@ if(BUILD_TESTING)
 
   target_link_libraries(test_planning_scene
     rco_core
+    moveit_core::moveit_test_utils
   )
 
   target_link_libraries(test_toolchain

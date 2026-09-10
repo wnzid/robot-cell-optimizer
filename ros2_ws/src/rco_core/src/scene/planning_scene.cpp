@@ -3,6 +3,7 @@
 #include "rco_core/domain/model.hpp"
 #include "rco_core/scene/collision_object.hpp"
 
+#include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
 
 namespace rco_core::scene {
@@ -14,6 +15,10 @@ moveit_msgs::msg::PlanningScene makePlanningSceneWorldDiff(const domain::CellDef
   scene.robot_state.is_diff = true;
   scene.is_diff = true;
   return scene;
+}
+
+bool applyCellWorldDiff(planning_scene::PlanningScene& scene, const domain::CellDefinition& cell) {
+  return scene.setPlanningSceneDiffMsg(makePlanningSceneWorldDiff(cell));
 }
 
 } // namespace rco_core::scene
