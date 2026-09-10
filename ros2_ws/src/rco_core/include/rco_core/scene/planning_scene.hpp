@@ -17,4 +17,9 @@ makePlanningSceneWorldDiff(const domain::CellDefinition& cell);
 [[nodiscard]] bool applyCellWorldDiff(planning_scene::PlanningScene& scene,
                                       const domain::CellDefinition& cell);
 
+// Replaces all world collision objects with the validated cell contents.
+// Validation failures throw before any existing world object is removed.
+[[nodiscard]] bool replaceCellWorld(planning_scene::PlanningScene& scene,
+                                    const domain::CellDefinition& cell);
+
 } // namespace rco_core::scene

@@ -21,4 +21,10 @@ bool applyCellWorldDiff(planning_scene::PlanningScene& scene, const domain::Cell
   return scene.setPlanningSceneDiffMsg(makePlanningSceneWorldDiff(cell));
 }
 
+bool replaceCellWorld(planning_scene::PlanningScene& scene, const domain::CellDefinition& cell) {
+  const auto world_diff = makePlanningSceneWorldDiff(cell);
+  scene.removeAllCollisionObjects();
+  return scene.setPlanningSceneDiffMsg(world_diff);
+}
+
 } // namespace rco_core::scene

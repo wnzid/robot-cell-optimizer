@@ -131,4 +131,60 @@ TEST_F(PlanningSceneTest, RejectsInvalidCellBeforeMutatingMoveItScene) {
   EXPECT_TRUE(scene.getWorld()->hasObject("table_1"));
 }
 
+TEST_F(PlanningSceneTest, ReplacesExistingWorldWithoutLeavingStaleObjects) {
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  const auto robot_model = builder.build();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  auto initial_cell = makeCell();
+  initial_cell.entities = {makeBox("table_1"), makeSphere("obstacle_1")};
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(scene, initial_cell));
+  auto replacement_cell = makeCell();
+  replacement_cell.id = "cell_2";
+  replacement_cell.entities = {makeSphere("fixture_1")};
+
+  ASSERT_TRUE(rco_core::scene::replaceCellWorld(scene, replacement_cell));
+
+  EXPECT_EQ(scene.getName(), "cell_2");
+  EXPECT_EQ(scene.getWorld()->size(), 1U);
+  EXPECT_FALSE(scene.getWorld()->hasObject("table_1"));
+  EXPECT_FALSE(scene.getWorld()->hasObject("obstacle_1"));
+  EXPECT_TRUE(scene.getWorld()->hasObject("fixture_1"));
+}
+
+TEST_F(PlanningSceneTest, ReplacesExistingWorldWithEmptyCell) {
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  const auto robot_model = builder.build();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  auto initial_cell = makeCell();
+  initial_cell.entities = {makeBox("table_1")};
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(scene, initial_cell));
+  auto empty_cell = makeCell();
+  empty_cell.id = "empty_cell";
+
+  ASSERT_TRUE(rco_core::scene::replaceCellWorld(scene, empty_cell));
+
+  EXPECT_EQ(scene.getName(), "empty_cell");
+  EXPECT_TRUE(scene.getWorld()->getObjectIds().empty());
+}
+
+TEST_F(PlanningSceneTest, RejectsInvalidReplacementBeforeRemovingExistingWorld) {
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  const auto robot_model = builder.build();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  auto initial_cell = makeCell();
+  initial_cell.entities = {makeBox("table_1")};
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(scene, initial_cell));
+  auto invalid_cell = makeCell();
+  const auto duplicate = makeSphere("obstacle_1");
+  invalid_cell.entities = {duplicate, duplicate};
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::replaceCellWorld(scene, invalid_cell)),
+               std::invalid_argument);
+  EXPECT_EQ(scene.getWorld()->size(), 1U);
+  EXPECT_TRUE(scene.getWorld()->hasObject("table_1"));
+}
+
 } // namespace
