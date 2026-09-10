@@ -37,6 +37,7 @@ add_library(rco_core
   src/domain/serialization.cpp
   src/domain/validation.cpp
   src/scene/collision_object.cpp
+  src/scene/planning_scene.cpp
 )
 
 target_include_directories(rco_core
@@ -141,6 +142,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_collision_object
+    rco_core
+  )
+
+  ament_add_gtest(test_planning_scene
+    test/scene/test_planning_scene.cpp
+  )
+
+  target_link_libraries(test_planning_scene
     rco_core
   )
 
