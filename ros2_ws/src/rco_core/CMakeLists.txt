@@ -23,6 +23,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(geometric_shapes REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(moveit_core REQUIRED)
@@ -48,6 +49,7 @@ target_include_directories(rco_core
 
 ament_target_dependencies(rco_core
   rclcpp
+  geometric_shapes
   geometry_msgs
   sensor_msgs
   moveit_core
@@ -89,6 +91,7 @@ install(
 ament_export_targets(export_rco_core HAS_LIBRARY_TARGET)
 ament_export_dependencies(
   rclcpp
+  geometric_shapes
   geometry_msgs
   sensor_msgs
   moveit_core

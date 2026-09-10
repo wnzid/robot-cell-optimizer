@@ -2,10 +2,13 @@
 #include "rco_core/domain/types.hpp"
 #include "rco_core/scene/collision_object.hpp"
 
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <moveit_msgs/msg/collision_object.hpp>
+#include <shape_msgs/msg/mesh.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <stdexcept>
+#include <string>
 
 namespace {
 
@@ -33,6 +36,12 @@ CellDefinition makeCell() {
   cell.workpiece_pose.frame_id = "world";
   cell.workpiece_pose.orientation.w = 1.0;
   return cell;
+}
+
+std::string tetrahedronMeshUri() {
+  const auto mesh_path =
+      std::filesystem::path(__FILE__).parent_path() / "resources" / "tetrahedron.stl";
+  return "file://" + mesh_path.string();
 }
 
 TEST(CollisionObjectTest, ConvertsBoxWithPoseAndIdentity) {
@@ -94,9 +103,27 @@ TEST(CollisionObjectTest, RejectsInvalidEntityBeforeConversion) {
                std::invalid_argument);
 }
 
-TEST(CollisionObjectTest, DefersMeshGeometryExplicitly) {
+TEST(CollisionObjectTest, ConvertsLocalStlMeshWithPose) {
   auto entity = makeEntity(GeometryType::kMesh);
-  entity.geometry.mesh_uri = "package://rco_description/meshes/fixture.stl";
+  entity.geometry.mesh_uri = tetrahedronMeshUri();
+
+  const auto object = rco_core::scene::makeCollisionObject(entity);
+
+  EXPECT_TRUE(object.primitives.empty());
+  EXPECT_TRUE(object.primitive_poses.empty());
+  ASSERT_EQ(object.meshes.size(), 1U);
+  ASSERT_EQ(object.mesh_poses.size(), 1U);
+  EXPECT_FALSE(object.meshes.front().vertices.empty());
+  EXPECT_EQ(object.meshes.front().triangles.size(), 4U);
+  EXPECT_DOUBLE_EQ(object.mesh_poses.front().position.x, 1.0);
+  EXPECT_DOUBLE_EQ(object.mesh_poses.front().position.y, 2.0);
+  EXPECT_DOUBLE_EQ(object.mesh_poses.front().position.z, 3.0);
+  EXPECT_DOUBLE_EQ(object.mesh_poses.front().orientation.w, 1.0);
+}
+
+TEST(CollisionObjectTest, RejectsUnreadableMeshUri) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri = "file:///definitely/not/a/mesh.stl";
 
   EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObject(entity)),
                std::invalid_argument);
