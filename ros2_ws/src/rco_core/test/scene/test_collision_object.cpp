@@ -44,6 +44,10 @@ std::string tetrahedronMeshUri() {
   return "file://" + mesh_path.string();
 }
 
+std::string packageTetrahedronMeshUri() {
+  return "package://rco_description/meshes/tetrahedron.stl";
+}
+
 TEST(CollisionObjectTest, ConvertsBoxWithPoseAndIdentity) {
   auto entity = makeEntity(GeometryType::kBox);
   entity.geometry.size_m = {0.5, 0.25, 0.125};
@@ -119,6 +123,17 @@ TEST(CollisionObjectTest, ConvertsLocalStlMeshWithPose) {
   EXPECT_DOUBLE_EQ(object.mesh_poses.front().position.y, 2.0);
   EXPECT_DOUBLE_EQ(object.mesh_poses.front().position.z, 3.0);
   EXPECT_DOUBLE_EQ(object.mesh_poses.front().orientation.w, 1.0);
+}
+
+TEST(CollisionObjectTest, ConvertsPackageStlMesh) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri = packageTetrahedronMeshUri();
+
+  const auto object = rco_core::scene::makeCollisionObject(entity);
+
+  ASSERT_EQ(object.meshes.size(), 1U);
+  EXPECT_FALSE(object.meshes.front().vertices.empty());
+  EXPECT_EQ(object.meshes.front().triangles.size(), 4U);
 }
 
 TEST(CollisionObjectTest, RejectsUnreadableMeshUri) {

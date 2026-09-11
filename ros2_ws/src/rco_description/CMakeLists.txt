@@ -3,6 +3,11 @@ project(rco_description VERSION 0.1.0)
 
 find_package(ament_cmake REQUIRED)
 
+install(
+  DIRECTORY meshes
+  DESTINATION share/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
 

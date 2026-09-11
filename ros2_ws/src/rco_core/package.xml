@@ -36,6 +36,7 @@
   <test_depend>ament_index_python</test_depend>
   <test_depend>xacro</test_depend>
   <test_depend>python3-yaml</test_depend>
+  <test_depend>rco_description</test_depend>
   <test_depend>ur_description</test_depend>
   <test_depend>ur_moveit_config</test_depend>
 

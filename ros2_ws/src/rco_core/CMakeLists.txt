@@ -106,6 +106,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(launch_testing_ament_cmake REQUIRED)
   find_package(ament_lint_auto REQUIRED)
+  find_package(rco_description REQUIRED)
 
   # Project policy:
   # - ClangFormat is the canonical C++ formatter.
