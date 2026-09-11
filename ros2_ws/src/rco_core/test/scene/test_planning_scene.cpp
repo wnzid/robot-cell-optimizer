@@ -4,11 +4,14 @@
 
 #include <gtest/gtest.h>
 #include <moveit/planning_scene/planning_scene.hpp>
+#include <moveit/robot_model/robot_model.hpp>
 #include <moveit/utils/robot_model_test_utils.hpp>
+#include <moveit_msgs/msg/attached_collision_object.hpp>
 #include <rclcpp/utilities.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -16,6 +19,7 @@ using rco_core::domain::CellDefinition;
 using rco_core::domain::CellEntity;
 using rco_core::domain::CellEntityType;
 using rco_core::domain::GeometryType;
+using rco_core::domain::ToolDefinition;
 
 class PlanningSceneTest : public ::testing::Test {
 protected:
@@ -58,6 +62,26 @@ CellEntity makeSphere(const std::string& id) {
   entity.geometry.type = GeometryType::kSphere;
   entity.geometry.radius_m = 0.2;
   return entity;
+}
+
+ToolDefinition makeTool() {
+  ToolDefinition tool;
+  tool.id = "tool_1";
+  tool.name = "reference_tool";
+  tool.mass_kg = 1.0;
+  tool.tcp.frame_id = "tool0";
+  tool.tcp.orientation.w = 1.0;
+  auto geometry = rco_core::domain::GeometryDefinition{};
+  geometry.type = GeometryType::kBox;
+  geometry.size_m = {0.2, 0.1, 0.05};
+  tool.geometry = {geometry};
+  return tool;
+}
+
+moveit::core::RobotModelPtr makeToolRobotModel() {
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  builder.addChain("world->tool0", "fixed");
+  return builder.build();
 }
 
 TEST_F(PlanningSceneTest, BuildsNamedWorldDiffInDefinitionOrder) {
@@ -185,6 +209,36 @@ TEST_F(PlanningSceneTest, RejectsInvalidReplacementBeforeRemovingExistingWorld) 
                std::invalid_argument);
   EXPECT_EQ(scene.getWorld()->size(), 1U);
   EXPECT_TRUE(scene.getWorld()->hasObject("table_1"));
+}
+
+TEST_F(PlanningSceneTest, AppliesAttachedToolToMoveItScene) {
+  const auto robot_model = makeToolRobotModel();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  const std::vector<std::string> touch_links{"tool0"};
+
+  ASSERT_TRUE(rco_core::scene::applyAttachedTool(scene, makeTool(), touch_links));
+
+  EXPECT_TRUE(scene.getCurrentState().hasAttachedBody("tool_1"));
+  moveit_msgs::msg::AttachedCollisionObject attached;
+  ASSERT_TRUE(scene.getAttachedCollisionObjectMsg(attached, "tool_1"));
+  EXPECT_EQ(attached.link_name, "tool0");
+  EXPECT_EQ(attached.touch_links, touch_links);
+}
+
+TEST_F(PlanningSceneTest, RejectsInvalidToolBeforeMutatingMoveItScene) {
+  const auto robot_model = makeToolRobotModel();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  const std::vector<std::string> touch_links{"tool0"};
+  ASSERT_TRUE(rco_core::scene::applyAttachedTool(scene, makeTool(), touch_links));
+  auto invalid_tool = makeTool();
+  invalid_tool.geometry.front().size_m.y = 0.0;
+
+  EXPECT_THROW(
+      static_cast<void>(rco_core::scene::applyAttachedTool(scene, invalid_tool, touch_links)),
+      std::invalid_argument);
+  EXPECT_TRUE(scene.getCurrentState().hasAttachedBody("tool_1"));
 }
 
 } // namespace

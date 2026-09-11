@@ -4,6 +4,8 @@
 
 #include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
+#include <string>
+#include <vector>
 
 namespace rco_core::scene {
 
@@ -21,5 +23,11 @@ makePlanningSceneWorldDiff(const domain::CellDefinition& cell);
 // Validation failures throw before any existing world object is removed.
 [[nodiscard]] bool replaceCellWorld(planning_scene::PlanningScene& scene,
                                     const domain::CellDefinition& cell);
+
+// Applies validated tool geometry to the configured TCP parent link.
+// Validation failures throw before the target scene is mutated.
+[[nodiscard]] bool applyAttachedTool(planning_scene::PlanningScene& scene,
+                                     const domain::ToolDefinition& tool,
+                                     const std::vector<std::string>& touch_links);
 
 } // namespace rco_core::scene

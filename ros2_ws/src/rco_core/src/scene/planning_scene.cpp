@@ -5,6 +5,8 @@
 
 #include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
+#include <string>
+#include <vector>
 
 namespace rco_core::scene {
 
@@ -25,6 +27,12 @@ bool replaceCellWorld(planning_scene::PlanningScene& scene, const domain::CellDe
   const auto world_diff = makePlanningSceneWorldDiff(cell);
   scene.removeAllCollisionObjects();
   return scene.setPlanningSceneDiffMsg(world_diff);
+}
+
+bool applyAttachedTool(planning_scene::PlanningScene& scene, const domain::ToolDefinition& tool,
+                       const std::vector<std::string>& touch_links) {
+  return scene.processAttachedCollisionObjectMsg(
+      makeAttachedToolCollisionObject(tool, touch_links));
 }
 
 } // namespace rco_core::scene
