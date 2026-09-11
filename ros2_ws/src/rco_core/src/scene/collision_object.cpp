@@ -11,10 +11,12 @@
 #include <geometric_shapes/shapes.h>
 #include <geometry_msgs/msg/pose.hpp>
 #include <memory>
+#include <moveit_msgs/msg/attached_collision_object.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
 #include <shape_msgs/msg/mesh.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace rco_core::scene {
@@ -132,6 +134,16 @@ moveit_msgs::msg::CollisionObject makeToolCollisionObject(const domain::ToolDefi
   }
   object.operation = moveit_msgs::msg::CollisionObject::ADD;
   return object;
+}
+
+moveit_msgs::msg::AttachedCollisionObject
+makeAttachedToolCollisionObject(const domain::ToolDefinition& tool,
+                                const std::vector<std::string>& touch_links) {
+  moveit_msgs::msg::AttachedCollisionObject attached_object;
+  attached_object.link_name = tool.tcp.frame_id;
+  attached_object.object = makeToolCollisionObject(tool);
+  attached_object.touch_links = touch_links;
+  return attached_object;
 }
 
 std::vector<moveit_msgs::msg::CollisionObject>

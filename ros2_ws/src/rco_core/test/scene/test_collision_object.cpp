@@ -4,11 +4,13 @@
 
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <moveit_msgs/msg/attached_collision_object.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
 #include <shape_msgs/msg/mesh.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -218,6 +220,24 @@ TEST(CollisionObjectTest, RejectsInvalidToolBeforeConversion) {
 
   EXPECT_THROW(static_cast<void>(rco_core::scene::makeToolCollisionObject(tool)),
                std::invalid_argument);
+}
+
+TEST(CollisionObjectTest, WrapsToolGeometryForConfiguredLink) {
+  auto tool = makeTool();
+  auto box = rco_core::domain::GeometryDefinition{};
+  box.type = GeometryType::kBox;
+  box.size_m = {0.2, 0.1, 0.05};
+  tool.geometry = {box};
+  const std::vector<std::string> touch_links{"tool0", "wrist_3_link"};
+
+  const auto attached = rco_core::scene::makeAttachedToolCollisionObject(tool, touch_links);
+
+  EXPECT_EQ(attached.link_name, "tool0");
+  EXPECT_EQ(attached.object.id, "tool_1");
+  EXPECT_EQ(attached.object.header.frame_id, "tool0");
+  EXPECT_EQ(attached.object.operation, moveit_msgs::msg::CollisionObject::ADD);
+  ASSERT_EQ(attached.object.primitives.size(), 1U);
+  EXPECT_EQ(attached.touch_links, touch_links);
 }
 
 TEST(CollisionObjectTest, ConvertsCellEntitiesInDefinitionOrder) {
