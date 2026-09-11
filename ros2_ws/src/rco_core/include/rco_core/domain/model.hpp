@@ -71,6 +71,8 @@ struct ToolDefinition {
   // Pose of the TCP relative to the configured parent frame.
   Pose tcp;
 
+  // Collision geometry is authored in the TCP parent frame. Primitive origins
+  // coincide with that frame; mesh vertices retain their resource coordinates.
   std::vector<GeometryDefinition> geometry;
 
   bool operator==(const ToolDefinition&) const = default;

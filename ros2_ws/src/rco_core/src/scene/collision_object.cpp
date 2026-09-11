@@ -32,6 +32,12 @@ geometry_msgs::msg::Pose toRosPose(const domain::Pose& pose) {
   return result;
 }
 
+geometry_msgs::msg::Pose identityPose() {
+  geometry_msgs::msg::Pose pose;
+  pose.orientation.w = 1.0;
+  return pose;
+}
+
 shape_msgs::msg::SolidPrimitive makePrimitive(const domain::GeometryDefinition& geometry) {
   shape_msgs::msg::SolidPrimitive primitive;
 
@@ -81,6 +87,18 @@ shape_msgs::msg::Mesh makeMesh(const domain::GeometryDefinition& geometry) {
   return *mesh_message;
 }
 
+void appendGeometry(moveit_msgs::msg::CollisionObject& object,
+                    const domain::GeometryDefinition& geometry,
+                    const geometry_msgs::msg::Pose& pose) {
+  if (geometry.type == domain::GeometryType::kMesh) {
+    object.meshes.push_back(makeMesh(geometry));
+    object.mesh_poses.push_back(pose);
+  } else {
+    object.primitives.push_back(makePrimitive(geometry));
+    object.primitive_poses.push_back(pose);
+  }
+}
+
 } // namespace
 
 moveit_msgs::msg::CollisionObject makeCollisionObject(const domain::CellEntity& entity) {
@@ -93,12 +111,24 @@ moveit_msgs::msg::CollisionObject makeCollisionObject(const domain::CellEntity& 
   moveit_msgs::msg::CollisionObject object;
   object.header.frame_id = entity.pose.frame_id;
   object.id = entity.id;
-  if (entity.geometry.type == domain::GeometryType::kMesh) {
-    object.meshes.push_back(makeMesh(entity.geometry));
-    object.mesh_poses.push_back(toRosPose(entity.pose));
-  } else {
-    object.primitives.push_back(makePrimitive(entity.geometry));
-    object.primitive_poses.push_back(toRosPose(entity.pose));
+  appendGeometry(object, entity.geometry, toRosPose(entity.pose));
+  object.operation = moveit_msgs::msg::CollisionObject::ADD;
+  return object;
+}
+
+moveit_msgs::msg::CollisionObject makeToolCollisionObject(const domain::ToolDefinition& tool) {
+  const domain::ValidationErrors errors = domain::validate(tool);
+  if (!errors.empty()) {
+    throw std::invalid_argument("Invalid tool definition" + errors.front().path + ": " +
+                                errors.front().message);
+  }
+
+  moveit_msgs::msg::CollisionObject object;
+  object.header.frame_id = tool.tcp.frame_id;
+  object.id = tool.id;
+  const auto geometry_pose = identityPose();
+  for (const auto& geometry : tool.geometry) {
+    appendGeometry(object, geometry, geometry_pose);
   }
   object.operation = moveit_msgs::msg::CollisionObject::ADD;
   return object;

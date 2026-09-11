@@ -16,6 +16,7 @@ using rco_core::domain::CellDefinition;
 using rco_core::domain::CellEntity;
 using rco_core::domain::CellEntityType;
 using rco_core::domain::GeometryType;
+using rco_core::domain::ToolDefinition;
 
 CellEntity makeEntity(GeometryType geometry_type) {
   CellEntity entity;
@@ -36,6 +37,16 @@ CellDefinition makeCell() {
   cell.workpiece_pose.frame_id = "world";
   cell.workpiece_pose.orientation.w = 1.0;
   return cell;
+}
+
+ToolDefinition makeTool() {
+  ToolDefinition tool;
+  tool.id = "tool_1";
+  tool.name = "reference_tool";
+  tool.mass_kg = 1.0;
+  tool.tcp.frame_id = "tool0";
+  tool.tcp.orientation.w = 1.0;
+  return tool;
 }
 
 std::string tetrahedronMeshUri() {
@@ -171,6 +182,41 @@ TEST(CollisionObjectTest, RejectsUnreadableMeshUri) {
   entity.geometry.mesh_uri = "file:///definitely/not/a/mesh.stl";
 
   EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObject(entity)),
+               std::invalid_argument);
+}
+
+TEST(CollisionObjectTest, ConvertsToolPrimitivesInDefinitionOrder) {
+  auto tool = makeTool();
+  auto box = rco_core::domain::GeometryDefinition{};
+  box.type = GeometryType::kBox;
+  box.size_m = {0.2, 0.1, 0.05};
+  auto cylinder = rco_core::domain::GeometryDefinition{};
+  cylinder.type = GeometryType::kCylinder;
+  cylinder.radius_m = 0.03;
+  cylinder.height_m = 0.15;
+  tool.geometry = {box, cylinder};
+
+  const auto object = rco_core::scene::makeToolCollisionObject(tool);
+
+  EXPECT_EQ(object.id, "tool_1");
+  EXPECT_EQ(object.header.frame_id, "tool0");
+  EXPECT_EQ(object.operation, moveit_msgs::msg::CollisionObject::ADD);
+  ASSERT_EQ(object.primitives.size(), 2U);
+  ASSERT_EQ(object.primitive_poses.size(), 2U);
+  EXPECT_EQ(object.primitives[0].type, shape_msgs::msg::SolidPrimitive::BOX);
+  EXPECT_EQ(object.primitives[1].type, shape_msgs::msg::SolidPrimitive::CYLINDER);
+  EXPECT_DOUBLE_EQ(object.primitive_poses[0].orientation.w, 1.0);
+  EXPECT_DOUBLE_EQ(object.primitive_poses[1].orientation.w, 1.0);
+}
+
+TEST(CollisionObjectTest, RejectsInvalidToolBeforeConversion) {
+  auto tool = makeTool();
+  auto box = rco_core::domain::GeometryDefinition{};
+  box.type = GeometryType::kBox;
+  box.size_m = {0.2, 0.0, 0.05};
+  tool.geometry = {box};
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::makeToolCollisionObject(tool)),
                std::invalid_argument);
 }
 

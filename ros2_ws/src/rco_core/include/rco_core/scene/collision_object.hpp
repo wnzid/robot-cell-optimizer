@@ -7,10 +7,15 @@
 
 namespace rco_core::scene {
 
-// Converts one validated primitive cell entity into a MoveIt collision object.
-// Mesh geometry is intentionally deferred to a later scene-engine increment.
+// Converts one validated cell entity into a MoveIt collision object.
 [[nodiscard]] moveit_msgs::msg::CollisionObject
 makeCollisionObject(const domain::CellEntity& entity);
+
+// Converts validated tool geometry into one MoveIt collision object in the
+// configured TCP parent frame. Geometry order is preserved within each MoveIt
+// shape collection and all local shape poses are identity transforms.
+[[nodiscard]] moveit_msgs::msg::CollisionObject
+makeToolCollisionObject(const domain::ToolDefinition& tool);
 
 // Preserves CellDefinition entity order and validates the complete cell before
 // producing any collision objects.
