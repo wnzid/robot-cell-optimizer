@@ -30,4 +30,11 @@ makePlanningSceneWorldDiff(const domain::CellDefinition& cell);
                                      const domain::ToolDefinition& tool,
                                      const std::vector<std::string>& touch_links);
 
+// Replaces one explicitly identified attached tool. The replacement is fully
+// validated and its attachment link checked before the previous body is removed.
+[[nodiscard]] bool replaceAttachedTool(planning_scene::PlanningScene& scene,
+                                       const std::string& previous_tool_id,
+                                       const domain::ToolDefinition& tool,
+                                       const std::vector<std::string>& touch_links);
+
 } // namespace rco_core::scene

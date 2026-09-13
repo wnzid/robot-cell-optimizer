@@ -35,4 +35,18 @@ bool applyAttachedTool(planning_scene::PlanningScene& scene, const domain::ToolD
       makeAttachedToolCollisionObject(tool, touch_links));
 }
 
+bool replaceAttachedTool(planning_scene::PlanningScene& scene, const std::string& previous_tool_id,
+                         const domain::ToolDefinition& tool,
+                         const std::vector<std::string>& touch_links) {
+  const auto attached_tool = makeAttachedToolCollisionObject(tool, touch_links);
+  if (!scene.getRobotModel()->hasLinkModel(attached_tool.link_name)) {
+    return false;
+  }
+
+  if (!previous_tool_id.empty()) {
+    scene.getCurrentStateNonConst().clearAttachedBody(previous_tool_id);
+  }
+  return scene.processAttachedCollisionObjectMsg(attached_tool);
+}
+
 } // namespace rco_core::scene

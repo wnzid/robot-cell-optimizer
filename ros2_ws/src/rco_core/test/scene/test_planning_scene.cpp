@@ -241,4 +241,34 @@ TEST_F(PlanningSceneTest, RejectsInvalidToolBeforeMutatingMoveItScene) {
   EXPECT_TRUE(scene.getCurrentState().hasAttachedBody("tool_1"));
 }
 
+TEST_F(PlanningSceneTest, ReplacesAttachedToolWithoutLeavingStaleBody) {
+  const auto robot_model = makeToolRobotModel();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  const std::vector<std::string> touch_links{"tool0"};
+  ASSERT_TRUE(rco_core::scene::applyAttachedTool(scene, makeTool(), touch_links));
+  auto replacement = makeTool();
+  replacement.id = "tool_2";
+
+  ASSERT_TRUE(rco_core::scene::replaceAttachedTool(scene, "tool_1", replacement, touch_links));
+
+  EXPECT_FALSE(scene.getCurrentState().hasAttachedBody("tool_1"));
+  EXPECT_TRUE(scene.getCurrentState().hasAttachedBody("tool_2"));
+}
+
+TEST_F(PlanningSceneTest, RejectsUnknownReplacementLinkBeforeRemovingTool) {
+  const auto robot_model = makeToolRobotModel();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  const std::vector<std::string> touch_links{"tool0"};
+  ASSERT_TRUE(rco_core::scene::applyAttachedTool(scene, makeTool(), touch_links));
+  auto replacement = makeTool();
+  replacement.id = "tool_2";
+  replacement.tcp.frame_id = "missing_link";
+
+  EXPECT_FALSE(rco_core::scene::replaceAttachedTool(scene, "tool_1", replacement, touch_links));
+  EXPECT_TRUE(scene.getCurrentState().hasAttachedBody("tool_1"));
+  EXPECT_FALSE(scene.getCurrentState().hasAttachedBody("tool_2"));
+}
+
 } // namespace
