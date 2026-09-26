@@ -31,6 +31,14 @@ find_package(moveit_msgs REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(OpenCASCADE REQUIRED COMPONENTS
+  FoundationClasses
+  ModelingData
+  ModelingAlgorithms
+  Visualization
+  ApplicationFramework
+  DataExchange
+)
 find_package(yaml-cpp REQUIRED)
 
 add_library(rco_core
@@ -61,6 +69,8 @@ ament_target_dependencies(rco_core
 target_link_libraries(rco_core
   Eigen3::Eigen
   yaml-cpp::yaml-cpp
+  TKMesh
+  TKSTEP
 )
 
 add_executable(robot_diagnostics

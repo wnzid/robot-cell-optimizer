@@ -38,7 +38,8 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
             clang-format \
             clang-tidy \
-            lcov
+            lcov \
+            libocct-data-exchange-dev
 
       - name: Install ROS dependencies
         shell: bash
@@ -49,6 +50,7 @@ jobs:
             --from-paths ros2_ws/src \
             --ignore-src \
             --rosdistro jazzy \
+            --skip-keys opencascade \
             -r \
             -y
 

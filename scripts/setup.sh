@@ -32,12 +32,20 @@ fi
 echo
 echo "=== ROS dependencies ==="
 
+if ! dpkg-query -W -f='${Status}' libocct-data-exchange-dev 2>/dev/null \
+  | grep -q "ok installed"; then
+  echo "Installing Open CASCADE STEP development libraries..."
+  sudo apt-get update
+  sudo apt-get install -y libocct-data-exchange-dev
+fi
+
 rosdep update
 
 rosdep install \
   --from-paths ros2_ws/src \
   --ignore-src \
   --rosdistro jazzy \
+  --skip-keys opencascade \
   -r \
   -y
 
