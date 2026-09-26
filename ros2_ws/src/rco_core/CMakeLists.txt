@@ -47,12 +47,18 @@ add_library(rco_core
   src/domain/validation.cpp
   src/scene/collision_object.cpp
   src/scene/planning_scene.cpp
+  src/scene/step_mesh.cpp
 )
 
 target_include_directories(rco_core
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(rco_core SYSTEM
+  PRIVATE
+    ${OpenCASCADE_INCLUDE_DIR}
 )
 
 ament_target_dependencies(rco_core
@@ -157,6 +163,13 @@ if(BUILD_TESTING)
 
   target_link_libraries(test_collision_object
     rco_core
+    TKPrim
+    TKSTEP
+  )
+
+  target_include_directories(test_collision_object SYSTEM
+    PRIVATE
+      ${OpenCASCADE_INCLUDE_DIR}
   )
 
   ament_add_gtest(test_planning_scene

@@ -2,8 +2,16 @@
 #include "rco_core/domain/types.hpp"
 #include "rco_core/scene/collision_object.hpp"
 
+#include <BRepPrimAPI_MakeBox.hxx>
+#include <IFSelect_ReturnStatus.hxx>
+#include <STEPControl_StepModelType.hxx>
+#include <STEPControl_Writer.hxx>
+#include <TopoDS_Shape.hxx>
+#include <algorithm>
+#include <array>
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <limits>
 #include <moveit_msgs/msg/attached_collision_object.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
 #include <shape_msgs/msg/mesh.hpp>
@@ -67,6 +75,31 @@ std::string packageTetrahedronObjMeshUri() {
 
 std::string packageTetrahedronDaeMeshUri() {
   return "package://rco_description/meshes/tetrahedron.dae";
+}
+
+std::string writeStepBox() {
+  const auto path = std::filesystem::temp_directory_path() / "rco_core_collision_box.step";
+  const TopoDS_Shape box = BRepPrimAPI_MakeBox(1000.0, 500.0, 250.0).Shape();
+  STEPControl_Writer writer;
+  if (writer.Transfer(box, STEPControl_AsIs) != IFSelect_RetDone) {
+    throw std::runtime_error("Failed to transfer STEP box test fixture.");
+  }
+  const std::string path_string = path.string();
+  if (writer.Write(path_string.c_str()) != IFSelect_RetDone) {
+    throw std::runtime_error("Failed to write STEP box test fixture.");
+  }
+  return "file://" + path_string;
+}
+
+std::array<double, 3> maximumCoordinates(const shape_msgs::msg::Mesh& mesh) {
+  const double lowest = std::numeric_limits<double>::lowest();
+  std::array<double, 3> maximum{lowest, lowest, lowest};
+  for (const auto& vertex : mesh.vertices) {
+    maximum[0] = std::max(maximum[0], vertex.x);
+    maximum[1] = std::max(maximum[1], vertex.y);
+    maximum[2] = std::max(maximum[2], vertex.z);
+  }
+  return maximum;
 }
 
 TEST(CollisionObjectTest, ConvertsBoxWithPoseAndIdentity) {
@@ -177,6 +210,21 @@ TEST(CollisionObjectTest, ConvertsPackageDaeMesh) {
   ASSERT_EQ(object.meshes.size(), 1U);
   EXPECT_FALSE(object.meshes.front().vertices.empty());
   EXPECT_EQ(object.meshes.front().triangles.size(), 4U);
+}
+
+TEST(CollisionObjectTest, TessellatesLocalStepMeshInMeters) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri = writeStepBox();
+
+  const auto object = rco_core::scene::makeCollisionObject(entity);
+
+  ASSERT_EQ(object.meshes.size(), 1U);
+  const auto& mesh = object.meshes.front();
+  EXPECT_EQ(mesh.triangles.size(), 12U);
+  const auto maximum = maximumCoordinates(mesh);
+  EXPECT_NEAR(maximum[0], 1.0, 1e-9);
+  EXPECT_NEAR(maximum[1], 0.5, 1e-9);
+  EXPECT_NEAR(maximum[2], 0.25, 1e-9);
 }
 
 TEST(CollisionObjectTest, RejectsUnreadableMeshUri) {

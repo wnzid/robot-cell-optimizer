@@ -3,6 +3,7 @@
 #include "rco_core/domain/model.hpp"
 #include "rco_core/domain/types.hpp"
 #include "rco_core/domain/validation.hpp"
+#include "step_mesh.hpp"
 
 #include <boost/variant/get.hpp>
 #include <geometric_shapes/mesh_operations.h>
@@ -70,6 +71,10 @@ shape_msgs::msg::SolidPrimitive makePrimitive(const domain::GeometryDefinition& 
 }
 
 shape_msgs::msg::Mesh makeMesh(const domain::GeometryDefinition& geometry) {
+  if (detail::isStepMeshUri(geometry.mesh_uri)) {
+    return detail::makeStepMesh(geometry.mesh_uri);
+  }
+
   const std::unique_ptr<shapes::Mesh> mesh(shapes::createMeshFromResource(geometry.mesh_uri));
   if (!mesh) {
     throw std::invalid_argument("Failed to load mesh collision geometry from '" +
