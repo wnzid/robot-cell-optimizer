@@ -14,8 +14,8 @@ namespace rco_core::scene {
 [[nodiscard]] moveit_msgs::msg::PlanningScene
 makePlanningSceneWorldDiff(const domain::CellDefinition& cell);
 
-// Adds the validated cell's workpiece pose as one explicitly named fixed frame.
-// The child frame is an API input because it is not part of the current DTO.
+// Adds the validated cell's workpiece pose as one explicitly named MoveIt fixed
+// frame. The source frame name is an API input because it is absent from the DTO.
 [[nodiscard]] moveit_msgs::msg::PlanningScene
 makePlanningSceneWorldDiff(const domain::CellDefinition& cell, const std::string& workpiece_frame);
 
@@ -24,10 +24,18 @@ makePlanningSceneWorldDiff(const domain::CellDefinition& cell, const std::string
 [[nodiscard]] bool applyCellWorldDiff(planning_scene::PlanningScene& scene,
                                       const domain::CellDefinition& cell);
 
+[[nodiscard]] bool applyCellWorldDiff(planning_scene::PlanningScene& scene,
+                                      const domain::CellDefinition& cell,
+                                      const std::string& workpiece_frame);
+
 // Replaces all world collision objects with the validated cell contents.
 // Validation failures throw before any existing world object is removed.
 [[nodiscard]] bool replaceCellWorld(planning_scene::PlanningScene& scene,
                                     const domain::CellDefinition& cell);
+
+[[nodiscard]] bool replaceCellWorld(planning_scene::PlanningScene& scene,
+                                    const domain::CellDefinition& cell,
+                                    const std::string& workpiece_frame);
 
 // Applies validated tool geometry to the configured TCP parent link.
 // Validation failures throw before the target scene is mutated.

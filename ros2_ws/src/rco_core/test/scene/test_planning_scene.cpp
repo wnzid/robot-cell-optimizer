@@ -2,11 +2,13 @@
 #include "rco_core/domain/types.hpp"
 #include "rco_core/scene/planning_scene.hpp"
 
+#include <algorithm>
 #include <gtest/gtest.h>
 #include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit/robot_model/robot_model.hpp>
 #include <moveit/utils/robot_model_test_utils.hpp>
 #include <moveit_msgs/msg/attached_collision_object.hpp>
+#include <moveit_msgs/msg/planning_scene.hpp>
 #include <rclcpp/utilities.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <stdexcept>
@@ -84,6 +86,18 @@ moveit::core::RobotModelPtr makeToolRobotModel() {
   return builder.build();
 }
 
+void expectWorkpieceTransform(const moveit_msgs::msg::PlanningScene& snapshot) {
+  const auto workpiece_transform =
+      std::ranges::find_if(snapshot.fixed_frame_transforms, [](const auto& transform) {
+        return transform.header.frame_id == "workpiece";
+      });
+  ASSERT_NE(workpiece_transform, snapshot.fixed_frame_transforms.end());
+  EXPECT_EQ(workpiece_transform->child_frame_id, "world");
+  EXPECT_DOUBLE_EQ(workpiece_transform->transform.translation.x, 1.0);
+  EXPECT_DOUBLE_EQ(workpiece_transform->transform.translation.y, 2.0);
+  EXPECT_DOUBLE_EQ(workpiece_transform->transform.translation.z, 3.0);
+}
+
 TEST_F(PlanningSceneTest, BuildsNamedWorldDiffInDefinitionOrder) {
   auto cell = makeCell();
   cell.entities = {makeBox("table_1"), makeSphere("obstacle_1")};
@@ -121,8 +135,8 @@ TEST_F(PlanningSceneTest, BuildsWorldDiffWithExplicitWorkpieceFrame) {
 
   ASSERT_EQ(scene.fixed_frame_transforms.size(), 1U);
   const auto& transform = scene.fixed_frame_transforms.front();
-  EXPECT_EQ(transform.header.frame_id, "world");
-  EXPECT_EQ(transform.child_frame_id, "workpiece");
+  EXPECT_EQ(transform.header.frame_id, "workpiece");
+  EXPECT_EQ(transform.child_frame_id, "world");
   EXPECT_DOUBLE_EQ(transform.transform.translation.x, 1.0);
   EXPECT_DOUBLE_EQ(transform.transform.translation.y, 2.0);
   EXPECT_DOUBLE_EQ(transform.transform.translation.z, 3.0);
@@ -157,6 +171,21 @@ TEST_F(PlanningSceneTest, AppliesCellWorldDiffToMoveItScene) {
   EXPECT_EQ(scene.getWorld()->size(), 2U);
   EXPECT_TRUE(scene.getWorld()->hasObject("table_1"));
   EXPECT_TRUE(scene.getWorld()->hasObject("obstacle_1"));
+}
+
+TEST_F(PlanningSceneTest, AppliesExplicitWorkpieceFrameToMoveItScene) {
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  const auto robot_model = builder.build();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  auto cell = makeCell();
+  cell.workpiece_pose.position = {1.0, 2.0, 3.0};
+
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(scene, cell, "workpiece"));
+
+  moveit_msgs::msg::PlanningScene snapshot;
+  scene.getPlanningSceneMsg(snapshot);
+  expectWorkpieceTransform(snapshot);
 }
 
 TEST_F(PlanningSceneTest, RejectsInvalidCellBeforeMutatingMoveItScene) {
@@ -229,6 +258,21 @@ TEST_F(PlanningSceneTest, RejectsInvalidReplacementBeforeRemovingExistingWorld) 
   invalid_cell.entities = {duplicate, duplicate};
 
   EXPECT_THROW(static_cast<void>(rco_core::scene::replaceCellWorld(scene, invalid_cell)),
+               std::invalid_argument);
+  EXPECT_EQ(scene.getWorld()->size(), 1U);
+  EXPECT_TRUE(scene.getWorld()->hasObject("table_1"));
+}
+
+TEST_F(PlanningSceneTest, RejectsEmptyWorkpieceFrameBeforeRemovingExistingWorld) {
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  const auto robot_model = builder.build();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene scene(robot_model);
+  auto initial_cell = makeCell();
+  initial_cell.entities = {makeBox("table_1")};
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(scene, initial_cell));
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::replaceCellWorld(scene, makeCell(), "")),
                std::invalid_argument);
   EXPECT_EQ(scene.getWorld()->size(), 1U);
   EXPECT_TRUE(scene.getWorld()->hasObject("table_1"));

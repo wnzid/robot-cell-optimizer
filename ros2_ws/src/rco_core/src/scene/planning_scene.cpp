@@ -29,8 +29,10 @@ moveit_msgs::msg::PlanningScene makePlanningSceneWorldDiff(const domain::CellDef
 
   auto scene = makePlanningSceneWorldDiff(cell);
   geometry_msgs::msg::TransformStamped transform;
-  transform.header.frame_id = cell.workpiece_pose.frame_id;
-  transform.child_frame_id = workpiece_frame;
+  // MoveIt stores fixed transforms from the named source frame into its target
+  // planning frame, represented here with the planning frame as child_frame_id.
+  transform.header.frame_id = workpiece_frame;
+  transform.child_frame_id = cell.workpiece_pose.frame_id;
   transform.transform.translation.x = cell.workpiece_pose.position.x;
   transform.transform.translation.y = cell.workpiece_pose.position.y;
   transform.transform.translation.z = cell.workpiece_pose.position.z;
@@ -46,8 +48,20 @@ bool applyCellWorldDiff(planning_scene::PlanningScene& scene, const domain::Cell
   return scene.setPlanningSceneDiffMsg(makePlanningSceneWorldDiff(cell));
 }
 
+bool applyCellWorldDiff(planning_scene::PlanningScene& scene, const domain::CellDefinition& cell,
+                        const std::string& workpiece_frame) {
+  return scene.setPlanningSceneDiffMsg(makePlanningSceneWorldDiff(cell, workpiece_frame));
+}
+
 bool replaceCellWorld(planning_scene::PlanningScene& scene, const domain::CellDefinition& cell) {
   const auto world_diff = makePlanningSceneWorldDiff(cell);
+  scene.removeAllCollisionObjects();
+  return scene.setPlanningSceneDiffMsg(world_diff);
+}
+
+bool replaceCellWorld(planning_scene::PlanningScene& scene, const domain::CellDefinition& cell,
+                      const std::string& workpiece_frame) {
+  const auto world_diff = makePlanningSceneWorldDiff(cell, workpiece_frame);
   scene.removeAllCollisionObjects();
   return scene.setPlanningSceneDiffMsg(world_diff);
 }
