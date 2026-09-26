@@ -1,4 +1,5 @@
 #include "rco_core/domain/model.hpp"
+#include "rco_core/domain/serialization.hpp"
 #include "rco_core/domain/types.hpp"
 #include "rco_core/scene/planning_scene.hpp"
 
@@ -186,6 +187,31 @@ TEST_F(PlanningSceneTest, AppliesExplicitWorkpieceFrameToMoveItScene) {
   moveit_msgs::msg::PlanningScene snapshot;
   scene.getPlanningSceneMsg(snapshot);
   expectWorkpieceTransform(snapshot);
+}
+
+TEST_F(PlanningSceneTest, BuildsEquivalentPlanningSceneAfterYamlReload) {
+  auto cell = makeCell();
+  cell.workpiece_pose.position = {1.0, 2.0, 3.0};
+  cell.entities = {makeBox("table_1"), makeSphere("obstacle_1")};
+  const auto parsed = rco_core::domain::parseCellYaml(rco_core::domain::serializeCellYaml(cell));
+  ASSERT_TRUE(parsed.ok());
+  const auto reloaded_cell = parsed.value.value_or(CellDefinition{});
+
+  moveit::core::RobotModelBuilder builder("test_robot", "world");
+  const auto robot_model = builder.build();
+  ASSERT_NE(robot_model, nullptr);
+  planning_scene::PlanningScene original_scene(robot_model);
+  planning_scene::PlanningScene reloaded_scene(robot_model);
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(original_scene, cell, "workpiece"));
+  ASSERT_TRUE(rco_core::scene::applyCellWorldDiff(reloaded_scene, reloaded_cell, "workpiece"));
+
+  moveit_msgs::msg::PlanningScene original_snapshot;
+  moveit_msgs::msg::PlanningScene reloaded_snapshot;
+  original_scene.getPlanningSceneMsg(original_snapshot);
+  reloaded_scene.getPlanningSceneMsg(reloaded_snapshot);
+  EXPECT_EQ(reloaded_snapshot.name, original_snapshot.name);
+  EXPECT_EQ(reloaded_snapshot.world.collision_objects, original_snapshot.world.collision_objects);
+  EXPECT_EQ(reloaded_snapshot.fixed_frame_transforms, original_snapshot.fixed_frame_transforms);
 }
 
 TEST_F(PlanningSceneTest, RejectsInvalidCellBeforeMutatingMoveItScene) {
