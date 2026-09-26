@@ -14,6 +14,11 @@ namespace rco_core::scene {
 [[nodiscard]] moveit_msgs::msg::PlanningScene
 makePlanningSceneWorldDiff(const domain::CellDefinition& cell);
 
+// Adds the validated cell's workpiece pose as one explicitly named fixed frame.
+// The child frame is an API input because it is not part of the current DTO.
+[[nodiscard]] moveit_msgs::msg::PlanningScene
+makePlanningSceneWorldDiff(const domain::CellDefinition& cell, const std::string& workpiece_frame);
+
 // Applies the validated cell as a world diff to an in-memory MoveIt scene.
 // Returns MoveIt's application result; validation failures throw before mutation.
 [[nodiscard]] bool applyCellWorldDiff(planning_scene::PlanningScene& scene,

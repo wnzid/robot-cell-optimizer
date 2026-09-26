@@ -109,6 +109,29 @@ TEST_F(PlanningSceneTest, BuildsEmptyWorldDiffForEmptyValidCell) {
   EXPECT_TRUE(scene.is_diff);
   EXPECT_TRUE(scene.robot_state.is_diff);
   EXPECT_TRUE(scene.world.collision_objects.empty());
+  EXPECT_TRUE(scene.fixed_frame_transforms.empty());
+}
+
+TEST_F(PlanningSceneTest, BuildsWorldDiffWithExplicitWorkpieceFrame) {
+  auto cell = makeCell();
+  cell.workpiece_pose.position = {1.0, 2.0, 3.0};
+  cell.workpiece_pose.orientation = {0.0, 0.0, 0.0, 1.0};
+
+  const auto scene = rco_core::scene::makePlanningSceneWorldDiff(cell, "workpiece");
+
+  ASSERT_EQ(scene.fixed_frame_transforms.size(), 1U);
+  const auto& transform = scene.fixed_frame_transforms.front();
+  EXPECT_EQ(transform.header.frame_id, "world");
+  EXPECT_EQ(transform.child_frame_id, "workpiece");
+  EXPECT_DOUBLE_EQ(transform.transform.translation.x, 1.0);
+  EXPECT_DOUBLE_EQ(transform.transform.translation.y, 2.0);
+  EXPECT_DOUBLE_EQ(transform.transform.translation.z, 3.0);
+  EXPECT_DOUBLE_EQ(transform.transform.rotation.w, 1.0);
+}
+
+TEST_F(PlanningSceneTest, RejectsEmptyWorkpieceFrame) {
+  EXPECT_THROW(static_cast<void>(rco_core::scene::makePlanningSceneWorldDiff(makeCell(), "")),
+               std::invalid_argument);
 }
 
 TEST_F(PlanningSceneTest, RejectsInvalidCellBeforeBuildingDiff) {

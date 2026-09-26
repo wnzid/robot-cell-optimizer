@@ -3,8 +3,10 @@
 #include "rco_core/domain/model.hpp"
 #include "rco_core/scene/collision_object.hpp"
 
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,27 @@ moveit_msgs::msg::PlanningScene makePlanningSceneWorldDiff(const domain::CellDef
   scene.world.collision_objects = makeCollisionObjects(cell);
   scene.robot_state.is_diff = true;
   scene.is_diff = true;
+  return scene;
+}
+
+moveit_msgs::msg::PlanningScene makePlanningSceneWorldDiff(const domain::CellDefinition& cell,
+                                                           const std::string& workpiece_frame) {
+  if (workpiece_frame.empty()) {
+    throw std::invalid_argument("Workpiece frame must not be empty.");
+  }
+
+  auto scene = makePlanningSceneWorldDiff(cell);
+  geometry_msgs::msg::TransformStamped transform;
+  transform.header.frame_id = cell.workpiece_pose.frame_id;
+  transform.child_frame_id = workpiece_frame;
+  transform.transform.translation.x = cell.workpiece_pose.position.x;
+  transform.transform.translation.y = cell.workpiece_pose.position.y;
+  transform.transform.translation.z = cell.workpiece_pose.position.z;
+  transform.transform.rotation.x = cell.workpiece_pose.orientation.x;
+  transform.transform.rotation.y = cell.workpiece_pose.orientation.y;
+  transform.transform.rotation.z = cell.workpiece_pose.orientation.z;
+  transform.transform.rotation.w = cell.workpiece_pose.orientation.w;
+  scene.fixed_frame_transforms.push_back(transform);
   return scene;
 }
 
