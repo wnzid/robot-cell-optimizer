@@ -47,6 +47,7 @@ add_library(rco_core
   src/domain/csv.cpp
   src/domain/serialization.cpp
   src/domain/validation.cpp
+  src/task/path.cpp
   src/scene/collision_object.cpp
   src/scene/planning_scene.cpp
   src/scene/step_mesh.cpp
@@ -166,6 +167,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_domain_csv
+    rco_core
+  )
+
+  ament_add_gtest(test_task_path
+    test/task/test_path.cpp
+  )
+
+  target_link_libraries(test_task_path
     rco_core
   )
 
