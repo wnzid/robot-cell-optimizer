@@ -130,6 +130,25 @@ TEST(CollisionObjectTest, ConvertsBoxWithPoseAndIdentity) {
   EXPECT_DOUBLE_EQ(object.primitive_poses.front().orientation.w, 1.0);
 }
 
+TEST(CollisionObjectTest, ConvertsGroundBox) {
+  auto entity = makeEntity(GeometryType::kBox);
+  entity.id = "ground";
+  entity.type = CellEntityType::kGround;
+  entity.geometry.size_m = {20.0, 20.0, 0.2};
+
+  const auto object = rco_core::scene::makeCollisionObject(entity);
+
+  EXPECT_EQ(object.id, "ground");
+  ASSERT_EQ(object.primitives.size(), 1U);
+  EXPECT_EQ(object.primitives.front().type, shape_msgs::msg::SolidPrimitive::BOX);
+  EXPECT_DOUBLE_EQ(object.primitives.front().dimensions[shape_msgs::msg::SolidPrimitive::BOX_X],
+                   20.0);
+  EXPECT_DOUBLE_EQ(object.primitives.front().dimensions[shape_msgs::msg::SolidPrimitive::BOX_Y],
+                   20.0);
+  EXPECT_DOUBLE_EQ(object.primitives.front().dimensions[shape_msgs::msg::SolidPrimitive::BOX_Z],
+                   0.2);
+}
+
 TEST(CollisionObjectTest, ConvertsCylinderDimensionsInRosOrder) {
   auto entity = makeEntity(GeometryType::kCylinder);
   entity.geometry.radius_m = 0.2;
