@@ -5,9 +5,11 @@
 #include <cmath>
 #include <gtest/gtest.h>
 #include <limits>
+#include <numbers>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -86,6 +88,66 @@ TEST(TargetPathTest, RejectsInvalidTarget) {
   const auto finish = makeTarget("world", {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
 
   EXPECT_THROW(static_cast<void>(rco_core::task::interpolateTargetPose(start, finish, 0.5)),
+               std::invalid_argument);
+}
+
+TEST(TargetPathTest, ResamplesLinearSpacingAndPreservesEndpoints) {
+  const auto start = makeTarget("world", {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+  const auto finish = makeTarget("world", {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+
+  const auto targets = rco_core::task::resampleTargetPath({start, finish}, 0.4, std::numbers::pi);
+
+  ASSERT_EQ(targets.size(), 4U);
+  EXPECT_EQ(targets.front(), start);
+  EXPECT_NEAR(targets[1].pose.position.x, 1.0 / 3.0, 1e-12);
+  EXPECT_NEAR(targets[2].pose.position.x, 2.0 / 3.0, 1e-12);
+  EXPECT_EQ(targets.back(), finish);
+}
+
+TEST(TargetPathTest, ResamplesShortestAngularSpacing) {
+  const auto start = makeTarget("world", {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+  const auto finish = makeTarget("world", {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0, 0.0});
+
+  const auto targets =
+      rco_core::task::resampleTargetPath({start, finish}, 1.0, std::numbers::pi / 2.0);
+
+  ASSERT_EQ(targets.size(), 3U);
+  const double half_sqrt_two = std::sqrt(0.5);
+  EXPECT_NEAR(targets[1].pose.orientation.z, half_sqrt_two, 1e-12);
+  EXPECT_NEAR(targets[1].pose.orientation.w, half_sqrt_two, 1e-12);
+  EXPECT_EQ(targets.back(), finish);
+}
+
+TEST(TargetPathTest, PreservesAuthoredIntermediateWaypoints) {
+  const auto start = makeTarget("world", {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+  const auto middle = makeTarget("world", {0.5, 0.2, 0.0}, {0.0, 0.0, 0.0, 1.0});
+  const auto finish = makeTarget("world", {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+
+  const auto targets =
+      rco_core::task::resampleTargetPath({start, middle, finish}, 0.4, std::numbers::pi);
+
+  ASSERT_EQ(targets.size(), 5U);
+  EXPECT_EQ(targets[2], middle);
+}
+
+TEST(TargetPathTest, PreservesSingleTargetPath) {
+  const auto target = makeTarget("world", {1.0, 2.0, 3.0}, {0.0, 0.0, 0.0, 1.0});
+
+  EXPECT_EQ(rco_core::task::resampleTargetPath({target}, 0.1, 0.1),
+            std::vector<TargetPose>{target});
+}
+
+TEST(TargetPathTest, RejectsInvalidResamplingInputs) {
+  const auto world = makeTarget("world", {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+  const auto workpiece = makeTarget("workpiece", {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0});
+
+  EXPECT_THROW(static_cast<void>(rco_core::task::resampleTargetPath({}, 0.1, 0.1)),
+               std::invalid_argument);
+  EXPECT_THROW(static_cast<void>(rco_core::task::resampleTargetPath({world}, 0.0, 0.1)),
+               std::invalid_argument);
+  EXPECT_THROW(static_cast<void>(rco_core::task::resampleTargetPath({world}, 0.1, -0.1)),
+               std::invalid_argument);
+  EXPECT_THROW(static_cast<void>(rco_core::task::resampleTargetPath({world, workpiece}, 0.1, 0.1)),
                std::invalid_argument);
 }
 
