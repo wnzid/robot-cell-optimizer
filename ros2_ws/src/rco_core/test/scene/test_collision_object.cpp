@@ -246,6 +246,31 @@ TEST(CollisionObjectTest, TessellatesPackageStepMeshInMeters) {
   EXPECT_NEAR(maximum[2], 0.25, 1e-9);
 }
 
+TEST(CollisionObjectTest, RejectsUnreadableStepFile) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri = "file:///definitely/not/a/mesh.step";
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObject(entity)),
+               std::invalid_argument);
+}
+
+TEST(CollisionObjectTest, RejectsUnknownStepPackage) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri = "package://rco_missing_package/meshes/collision_box.step";
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObject(entity)),
+               std::invalid_argument);
+}
+
+TEST(CollisionObjectTest, RejectsPackageStepTraversal) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri =
+      "package://rco_description/../rco_description/meshes/collision_box.step";
+
+  EXPECT_THROW(static_cast<void>(rco_core::scene::makeCollisionObject(entity)),
+               std::invalid_argument);
+}
+
 TEST(CollisionObjectTest, RejectsUnreadableMeshUri) {
   auto entity = makeEntity(GeometryType::kMesh);
   entity.geometry.mesh_uri = "file:///definitely/not/a/mesh.stl";
