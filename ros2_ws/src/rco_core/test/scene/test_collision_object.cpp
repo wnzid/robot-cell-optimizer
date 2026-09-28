@@ -77,6 +77,10 @@ std::string packageTetrahedronDaeMeshUri() {
   return "package://rco_description/meshes/tetrahedron.dae";
 }
 
+std::string packageCollisionBoxStepUri() {
+  return "package://rco_description/meshes/collision_box.step";
+}
+
 std::string writeStepBox() {
   const auto path = std::filesystem::temp_directory_path() / "rco_core_collision_box.step";
   const TopoDS_Shape box = BRepPrimAPI_MakeBox(1000.0, 500.0, 250.0).Shape();
@@ -215,6 +219,21 @@ TEST(CollisionObjectTest, ConvertsPackageDaeMesh) {
 TEST(CollisionObjectTest, TessellatesLocalStepMeshInMeters) {
   auto entity = makeEntity(GeometryType::kMesh);
   entity.geometry.mesh_uri = writeStepBox();
+
+  const auto object = rco_core::scene::makeCollisionObject(entity);
+
+  ASSERT_EQ(object.meshes.size(), 1U);
+  const auto& mesh = object.meshes.front();
+  EXPECT_EQ(mesh.triangles.size(), 12U);
+  const auto maximum = maximumCoordinates(mesh);
+  EXPECT_NEAR(maximum[0], 1.0, 1e-9);
+  EXPECT_NEAR(maximum[1], 0.5, 1e-9);
+  EXPECT_NEAR(maximum[2], 0.25, 1e-9);
+}
+
+TEST(CollisionObjectTest, TessellatesPackageStepMeshInMeters) {
+  auto entity = makeEntity(GeometryType::kMesh);
+  entity.geometry.mesh_uri = packageCollisionBoxStepUri();
 
   const auto object = rco_core::scene::makeCollisionObject(entity);
 

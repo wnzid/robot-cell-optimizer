@@ -15,6 +15,8 @@
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <ament_index_cpp/get_package_prefix.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -31,6 +33,7 @@ namespace rco_core::scene::detail {
 namespace {
 
 constexpr std::string_view kFileUriPrefix{"file://"};
+constexpr std::string_view kPackageUriPrefix{"package://"};
 constexpr double kMillimetersPerMeter = 1000.0;
 constexpr double kLinearDeflectionMeters = 0.001;
 constexpr double kAngularDeflectionRadians = 0.5;
@@ -44,7 +47,36 @@ std::string lowercaseAscii(std::string value) {
   return value;
 }
 
-std::filesystem::path localStepPath(std::string_view uri) {
+std::filesystem::path packageStepPath(std::string_view uri) {
+  uri.remove_prefix(kPackageUriPrefix.size());
+  const std::size_t separator = uri.find('/');
+  if (separator == std::string_view::npos || separator == 0U || separator + 1U >= uri.size()) {
+    throw std::invalid_argument("Invalid STEP package URI: 'package://" + std::string(uri) + "'.");
+  }
+
+  const std::string package_name(uri.substr(0U, separator));
+  const std::filesystem::path relative_path(std::string(uri.substr(separator + 1U)));
+  for (const auto& component : relative_path) {
+    if (component == "..") {
+      throw std::invalid_argument(
+          "STEP package URI cannot traverse outside its package: 'package://" + std::string(uri) +
+          "'.");
+    }
+  }
+
+  try {
+    return std::filesystem::path(ament_index_cpp::get_package_share_directory(package_name)) /
+           relative_path;
+  } catch (const ament_index_cpp::PackageNotFoundError& error) {
+    throw std::invalid_argument("Failed to resolve STEP package URI 'package://" +
+                                std::string(uri) + "': " + error.what());
+  }
+}
+
+std::filesystem::path stepPath(std::string_view uri) {
+  if (uri.starts_with(kPackageUriPrefix)) {
+    return packageStepPath(uri);
+  }
   if (uri.starts_with(kFileUriPrefix)) {
     uri.remove_prefix(kFileUriPrefix.size());
   } else if (uri.find("://") != std::string_view::npos) {
@@ -115,7 +147,7 @@ bool isStepMeshUri(std::string_view uri) {
 }
 
 shape_msgs::msg::Mesh makeStepMesh(std::string_view uri) {
-  const std::filesystem::path path = localStepPath(uri);
+  const std::filesystem::path path = stepPath(uri);
   const std::string path_string = path.string();
   STEPControl_Reader reader;
   if (reader.ReadFile(path_string.c_str()) != IFSelect_RetDone) {

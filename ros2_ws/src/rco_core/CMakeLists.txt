@@ -22,6 +22,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometric_shapes REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -62,6 +63,7 @@ target_include_directories(rco_core SYSTEM
 )
 
 ament_target_dependencies(rco_core
+  ament_index_cpp
   rclcpp
   geometric_shapes
   geometry_msgs
@@ -106,6 +108,7 @@ install(
 
 ament_export_targets(export_rco_core HAS_LIBRARY_TARGET)
 ament_export_dependencies(
+  ament_index_cpp
   rclcpp
   geometric_shapes
   geometry_msgs
