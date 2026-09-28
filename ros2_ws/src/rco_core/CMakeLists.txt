@@ -44,6 +44,7 @@ find_package(yaml-cpp REQUIRED)
 
 add_library(rco_core
   src/robot_model_context.cpp
+  src/domain/csv.cpp
   src/domain/serialization.cpp
   src/domain/validation.cpp
   src/scene/collision_object.cpp
@@ -157,6 +158,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_domain_serialization
+    rco_core
+  )
+
+  ament_add_gtest(test_domain_csv
+    test/domain/test_csv.cpp
+  )
+
+  target_link_libraries(test_domain_csv
     rco_core
   )
 
