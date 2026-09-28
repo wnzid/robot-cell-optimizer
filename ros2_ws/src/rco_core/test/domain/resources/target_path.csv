@@ -1,0 +1,3 @@
+frame_id,x_m,y_m,z_m,qx,qy,qz,qw
+world,0.5,-0.25,0.1,0,0,0,1
+workpiece,0,0,0.4,0.5,-0.5,0.5,-0.5

@@ -3,6 +3,7 @@
 #include "rco_core/domain/validation.hpp"
 
 #include <algorithm>
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <string>
 #include <string_view>
@@ -19,6 +20,10 @@ bool containsError(const ValidationErrors& errors, const std::string& path,
   return std::ranges::any_of(errors, [&path, &message](const auto& error) {
     return error.path == path && error.message == message;
   });
+}
+
+std::filesystem::path targetPathCsvResource() {
+  return std::filesystem::path(__FILE__).parent_path() / "resources" / "target_path.csv";
 }
 
 TEST(TargetPathCsvTest, ParsesValidatedTargetsWithCrLfAndWhitespace) {
@@ -82,6 +87,27 @@ TEST(TargetPathCsvTest, RejectsPathWithoutTargets) {
 
   EXPECT_FALSE(result.ok());
   EXPECT_TRUE(containsError(result.errors, ".rows", "must contain at least one target"));
+}
+
+TEST(TargetPathCsvTest, LoadsLocalTargetPathFile) {
+  const auto result = rco_core::domain::loadTargetPathCsv(targetPathCsvResource());
+  const auto targets = result.value.value_or(std::vector<TargetPose>{});
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_TRUE(result.errors.empty());
+  ASSERT_EQ(targets.size(), 2U);
+  EXPECT_EQ(targets.front().pose.frame_id, "world");
+  EXPECT_EQ(targets.back().pose.frame_id, "workpiece");
+}
+
+TEST(TargetPathCsvTest, ReportsUnreadableFile) {
+  const auto result = rco_core::domain::loadTargetPathCsv(
+      std::filesystem::path("/definitely/not/a/target_path.csv"));
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".file",
+                            "could not open target path CSV file: "
+                            "'/definitely/not/a/target_path.csv'"));
 }
 
 } // namespace

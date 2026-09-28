@@ -3,6 +3,7 @@
 #include "rco_core/domain/model.hpp"
 #include "rco_core/domain/validation.hpp"
 
+#include <filesystem>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -26,5 +27,7 @@ struct TargetPathCsvParseResult {
 
 // Expected header: frame_id,x_m,y_m,z_m,qx,qy,qz,qw
 [[nodiscard]] TargetPathCsvParseResult parseTargetPathCsv(std::string_view csv_text);
+
+[[nodiscard]] TargetPathCsvParseResult loadTargetPathCsv(const std::filesystem::path& path);
 
 } // namespace rco_core::domain

@@ -8,6 +8,10 @@
 #include <charconv>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <ios>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -157,6 +161,26 @@ TargetPathCsvParseResult parseTargetPathCsv(std::string_view csv_text) {
     result.value = std::move(targets);
   }
   return result;
+}
+
+TargetPathCsvParseResult loadTargetPathCsv(const std::filesystem::path& path) {
+  std::ifstream input(path, std::ios::binary);
+  if (!input.is_open()) {
+    TargetPathCsvParseResult result;
+    result.errors.push_back(
+        {".file", "could not open target path CSV file: '" + path.string() + "'"});
+    return result;
+  }
+
+  const std::string contents{std::istreambuf_iterator<char>(input),
+                             std::istreambuf_iterator<char>()};
+  if (input.bad()) {
+    TargetPathCsvParseResult result;
+    result.errors.push_back(
+        {".file", "could not read target path CSV file: '" + path.string() + "'"});
+    return result;
+  }
+  return parseTargetPathCsv(contents);
 }
 
 } // namespace rco_core::domain
