@@ -67,6 +67,17 @@ CellEntity makeSphere(const std::string& id) {
   return entity;
 }
 
+CellEntity makePackageStepMesh(const std::string& id) {
+  CellEntity entity;
+  entity.id = id;
+  entity.type = CellEntityType::kObstacle;
+  entity.pose.frame_id = "world";
+  entity.pose.orientation.w = 1.0;
+  entity.geometry.type = GeometryType::kMesh;
+  entity.geometry.mesh_uri = "package://rco_description/meshes/collision_box.step";
+  return entity;
+}
+
 ToolDefinition makeTool() {
   ToolDefinition tool;
   tool.id = "tool_1";
@@ -192,7 +203,8 @@ TEST_F(PlanningSceneTest, AppliesExplicitWorkpieceFrameToMoveItScene) {
 TEST_F(PlanningSceneTest, BuildsEquivalentPlanningSceneAfterYamlReload) {
   auto cell = makeCell();
   cell.workpiece_pose.position = {1.0, 2.0, 3.0};
-  cell.entities = {makeBox("table_1"), makeSphere("obstacle_1")};
+  cell.entities = {makeBox("table_1"), makeSphere("obstacle_1"),
+                   makePackageStepMesh("step_fixture_1")};
   const auto parsed = rco_core::domain::parseCellYaml(rco_core::domain::serializeCellYaml(cell));
   ASSERT_TRUE(parsed.ok());
   const auto reloaded_cell = parsed.value.value_or(CellDefinition{});
