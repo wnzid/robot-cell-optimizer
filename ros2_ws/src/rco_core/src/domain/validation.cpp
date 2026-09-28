@@ -321,9 +321,19 @@ ValidationErrors validate(const ProcessSegment& segment) {
     });
   }
 
+  const std::string segment_frame =
+      segment.targets.empty() ? std::string{} : segment.targets.front().pose.frame_id;
   for (std::size_t index = 0; index < segment.targets.size(); ++index) {
+    const auto& target = segment.targets[index];
     appendErrors(errors, validate(segment.targets[index]),
                  ".targets[" + std::to_string(index) + "]");
+    if (index > 0U && !segment_frame.empty() && !target.pose.frame_id.empty() &&
+        target.pose.frame_id != segment_frame) {
+      errors.push_back({
+          ".targets[" + std::to_string(index) + "].pose.frame_id",
+          "must match the first target frame",
+      });
+    }
   }
 
   return errors;

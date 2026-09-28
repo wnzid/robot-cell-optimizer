@@ -581,6 +581,20 @@ TEST(DomainSerializationTest, ReportsNestedTaskTargetPosePath) {
       containsError(result.errors, ".segments[0].targets[0].pose.frame_id", "must not be empty"));
 }
 
+TEST(DomainSerializationTest, RejectsMixedTargetFramesAfterParsing) {
+  auto task = makeTask();
+  auto second_target = TargetPose{makePose()};
+  second_target.pose.frame_id = "workpiece";
+  task.segments.front().targets.push_back(second_target);
+
+  const TaskYamlParseResult result =
+      rco_core::domain::parseTaskYaml(rco_core::domain::serializeTaskYaml(task));
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(containsError(result.errors, ".segments[0].targets[1].pose.frame_id",
+                            "must match the first target frame"));
+}
+
 TEST(DomainSerializationTest, RoundTripsOptimizationExactly) {
   const OptimizationProblem optimization = makeOptimization();
 

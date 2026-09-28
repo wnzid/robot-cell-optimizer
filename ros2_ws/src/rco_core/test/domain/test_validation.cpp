@@ -349,6 +349,15 @@ TEST(DomainValidationTest, ReportsNestedTargetPosePath) {
   EXPECT_TRUE(containsPath(errors, ".segments[0].targets[0].pose.frame_id"));
 }
 
+TEST(DomainValidationTest, RejectsMixedFramesWithinSegment) {
+  auto task = makeValidTask();
+  task.segments.front().targets.push_back(TargetPose{makeValidPose("workpiece")});
+
+  const auto errors = rco_core::domain::validate(task);
+
+  EXPECT_TRUE(containsPath(errors, ".segments[0].targets[1].pose.frame_id"));
+}
+
 TEST(DomainValidationTest, RejectsZeroEvaluationBudget) {
   OptimizationProblem optimization;
   optimization.evaluation_budget = 0U;
