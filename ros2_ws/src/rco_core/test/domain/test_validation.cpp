@@ -273,6 +273,17 @@ TEST(DomainValidationTest, ReportsNestedCellEntityPosePath) {
   EXPECT_TRUE(containsPath(errors, ".pose.frame_id"));
 }
 
+TEST(DomainValidationTest, AcceptsGroundCellEntityType) {
+  CellEntity entity;
+  entity.id = "ground";
+  entity.type = CellEntityType::kGround;
+  entity.pose = makeValidPose("world");
+  entity.geometry.type = GeometryType::kBox;
+  entity.geometry.size_m = {10.0, 10.0, 0.1};
+
+  EXPECT_TRUE(rco_core::domain::validate(entity).empty());
+}
+
 TEST(DomainValidationTest, RejectsDuplicateCellEntityIds) {
   auto cell = makeValidCell();
   CellEntity entity;

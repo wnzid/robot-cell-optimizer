@@ -440,6 +440,18 @@ TEST(DomainSerializationTest, RoundTripsCellWithNestedEntities) {
   EXPECT_NE(yaml.find("type: fixture"), std::string::npos);
 }
 
+TEST(DomainSerializationTest, RoundTripsGroundCellEntityType) {
+  auto cell = makeCell();
+  cell.entities.front().type = CellEntityType::kGround;
+
+  const std::string yaml = rco_core::domain::serializeCellYaml(cell);
+  const CellYamlParseResult result = rco_core::domain::parseCellYaml(yaml);
+
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value, std::optional<CellDefinition>{cell});
+  EXPECT_NE(yaml.find("type: ground"), std::string::npos);
+}
+
 TEST(DomainSerializationTest, RejectsUnknownCellEntityTypeWithIndexedPath) {
   std::string yaml = rco_core::domain::serializeCellYaml(makeCell());
   const std::size_t type_position = yaml.find("type: fixture");
@@ -449,7 +461,7 @@ TEST(DomainSerializationTest, RejectsUnknownCellEntityTypeWithIndexedPath) {
 
   EXPECT_FALSE(result.ok());
   EXPECT_TRUE(containsError(result.errors, ".entities[0].type",
-                            "must be one of: table, workpiece, fixture, obstacle"));
+                            "must be one of: table, workpiece, fixture, obstacle, ground"));
 }
 
 TEST(DomainSerializationTest, ReportsNestedCellEntityGeometryPath) {

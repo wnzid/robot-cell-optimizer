@@ -27,6 +27,7 @@ enum class CellEntityType : std::uint8_t {
   kWorkpiece,
   kFixture,
   kObstacle,
+  kGround,
 };
 
 enum class ProcessSegmentType : std::uint8_t {

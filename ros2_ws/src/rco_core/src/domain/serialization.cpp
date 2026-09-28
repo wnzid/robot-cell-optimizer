@@ -361,6 +361,8 @@ std::string_view cellEntityTypeYamlName(CellEntityType type) {
     return "fixture";
   case CellEntityType::kObstacle:
     return "obstacle";
+  case CellEntityType::kGround:
+    return "ground";
   }
   return "unknown";
 }
@@ -382,6 +384,10 @@ bool parseCellEntityType(std::string_view text, CellEntityType& output) {
     output = CellEntityType::kObstacle;
     return true;
   }
+  if (text == "ground") {
+    output = CellEntityType::kGround;
+    return true;
+  }
   return false;
 }
 
@@ -400,7 +406,7 @@ void readCellEntity(const YAML::Node& node, std::string_view path, CellEntity& o
       readRequiredString(node, "type", type_name, std::string(path) + ".type", errors);
   if (has_type && !parseCellEntityType(type_name, output.type)) {
     addError(errors, std::string(path) + ".type",
-             "must be one of: table, workpiece, fixture, obstacle");
+             "must be one of: table, workpiece, fixture, obstacle, ground");
   }
 
   const YAML::Node pose = node["pose"];

@@ -253,6 +253,7 @@ ValidationErrors validate(const CellEntity& entity) {
   case CellEntityType::kWorkpiece:
   case CellEntityType::kFixture:
   case CellEntityType::kObstacle:
+  case CellEntityType::kGround:
     break;
   default:
     errors.push_back({".type", "unsupported cell entity type"});
