@@ -1,4 +1,5 @@
 #include "rco_core/domain/model.hpp"
+#include "rco_core/domain/serialization.hpp"
 #include "rco_core/domain/types.hpp"
 #include "rco_core/task/visualization.hpp"
 
@@ -63,6 +64,50 @@ void expectStableColorsAndMarkerIds(const visualization_msgs::msg::MarkerArray& 
   EXPECT_EQ(markers.markers[11].id, 11);
 }
 
+constexpr std::string_view weldingTaskYaml() {
+  return R"(id: welding_task
+segments:
+  - type: approach
+    targets:
+      - pose:
+          frame_id: workpiece
+          position: {x: 0, y: 0, z: 0.1}
+          orientation: {x: 0, y: 0, z: 0, w: 1}
+    tcp_speed_mps: 0.1
+  - type: process
+    targets:
+      - pose:
+          frame_id: workpiece
+          position: {x: 0, y: 0, z: 0}
+          orientation: {x: 0, y: 0, z: 0, w: 1}
+      - pose:
+          frame_id: workpiece
+          position: {x: 0.25, y: 0, z: 0}
+          orientation: {x: 0, y: 0, z: 0.7071067811865476, w: 0.7071067811865476}
+    tcp_speed_mps: 0.02
+  - type: retract
+    targets:
+      - pose:
+          frame_id: workpiece
+          position: {x: 0.25, y: 0, z: 0.1}
+          orientation: {x: 0, y: 0, z: 0.7071067811865476, w: 0.7071067811865476}
+    tcp_speed_mps: 0.1
+  - type: transition
+    targets:
+      - pose:
+          frame_id: workpiece
+          position: {x: 0, y: 0, z: 0.2}
+          orientation: {x: 0, y: 0, z: 0, w: 1}
+    tcp_speed_mps: 0.25)";
+}
+
+void expectWeldingSegmentColors(const visualization_msgs::msg::MarkerArray& markers) {
+  EXPECT_FLOAT_EQ(markers.markers[0].color.b, 1.0F);
+  EXPECT_FLOAT_EQ(markers.markers[3].color.g, 0.8F);
+  EXPECT_FLOAT_EQ(markers.markers[7].color.r, 1.0F);
+  EXPECT_FLOAT_EQ(markers.markers[10].color.r, 0.65F);
+}
+
 TEST(TaskVisualizationTest, BuildsOrderedPathWaypointAndOrientationMarkers) {
   const auto markers = rco_core::task::makeTaskPathMarkers(makeTask(), "weld_path");
 
@@ -111,6 +156,20 @@ TEST(TaskVisualizationTest, RejectsInvalidInputBeforeRendering) {
                std::invalid_argument);
   EXPECT_THROW(static_cast<void>(rco_core::task::makeTaskPathMarkers(makeTask(), "")),
                std::invalid_argument);
+}
+
+TEST(TaskVisualizationTest, LoadsAndVisualizesCompleteWeldingTaskWithoutRobot) {
+  const auto parsed = rco_core::domain::parseTaskYaml(weldingTaskYaml());
+  const auto task = parsed.value.value_or(TaskDefinition{});
+
+  ASSERT_TRUE(parsed.ok());
+  ASSERT_EQ(task.segments.size(), 4U);
+  const auto markers = rco_core::task::makeTaskPathMarkers(task, "welding_task");
+
+  ASSERT_EQ(markers.markers.size(), 13U);
+  ASSERT_EQ(markers.markers[3].points.size(), 2U);
+  EXPECT_EQ(markers.markers.front().header.frame_id, "workpiece");
+  expectWeldingSegmentColors(markers);
 }
 
 } // namespace
