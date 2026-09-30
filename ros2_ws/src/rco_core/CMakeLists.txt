@@ -49,6 +49,7 @@ add_library(rco_core
   src/domain/serialization.cpp
   src/domain/validation.cpp
   src/reachability/result.cpp
+  src/reachability/seed.cpp
   src/task/path.cpp
   src/task/visualization.cpp
   src/scene/collision_object.cpp
@@ -180,6 +181,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_reachability_result
+    rco_core
+  )
+
+  ament_add_gtest(test_reachability_seed
+    test/reachability/test_seed.cpp
+  )
+
+  target_link_libraries(test_reachability_seed
     rco_core
   )
 
