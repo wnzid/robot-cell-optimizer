@@ -28,6 +28,7 @@
   <depend>moveit_ros_planning</depend>
   <depend>opencascade</depend>
   <depend>shape_msgs</depend>
+  <depend>visualization_msgs</depend>
   <depend>eigen</depend>
   <depend>yaml-cpp</depend>
 

@@ -31,6 +31,7 @@ find_package(moveit_core REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(shape_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCASCADE REQUIRED COMPONENTS
   FoundationClasses
@@ -48,6 +49,7 @@ add_library(rco_core
   src/domain/serialization.cpp
   src/domain/validation.cpp
   src/task/path.cpp
+  src/task/visualization.cpp
   src/scene/collision_object.cpp
   src/scene/planning_scene.cpp
   src/scene/step_mesh.cpp
@@ -74,6 +76,7 @@ ament_target_dependencies(rco_core
   moveit_msgs
   moveit_ros_planning
   shape_msgs
+  visualization_msgs
 )
 
 target_link_libraries(rco_core
@@ -119,6 +122,7 @@ ament_export_dependencies(
   moveit_msgs
   moveit_ros_planning
   shape_msgs
+  visualization_msgs
   Eigen3
   yaml-cpp
 )
@@ -175,6 +179,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_task_path
+    rco_core
+  )
+
+  ament_add_gtest(test_task_visualization
+    test/task/test_visualization.cpp
+  )
+
+  target_link_libraries(test_task_visualization
     rco_core
   )
 
