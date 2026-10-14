@@ -111,13 +111,32 @@ SampleResult checkSolution(const RobotModelContext& robot, moveit::core::RobotSt
 
 SampleResult solveSeededIk(const RobotModelContext& robot, const domain::TargetPose& target,
                            const std::vector<double>& seed_rad, std::size_t sample_index) {
+  return solveSeededIk(robot, target, makeSeedState(robot, seed_rad), sample_index);
+}
+
+SampleResult solveSeededIk(const RobotModelContext& robot, const domain::TargetPose& target,
+                           const moveit::core::RobotState& seed_state, std::size_t sample_index) {
+  if (seed_state.getRobotModel() != robot.robotModel()) {
+    throw std::invalid_argument("IK seed state must share the configured robot model.");
+  }
+  for (const auto& name : seed_state.getVariableNames()) {
+    if (!std::isfinite(seed_state.getVariablePosition(name))) {
+      throw std::invalid_argument("IK seed state must contain finite joint positions.");
+    }
+  }
+  if (!seed_state.satisfiesBounds()) {
+    throw std::invalid_argument("IK seed state must satisfy all robot joint limits.");
+  }
   const auto* group = robot.jointModelGroup();
   const auto solver = group->getSolverInstance();
   if (!solver) {
     throw std::invalid_argument("Planning group has no IK solver.");
   }
   validateSolver(robot, *solver);
-  auto state = makeSeedState(robot, seed_rad);
+  auto state = seed_state;
+  state.update();
+  std::vector<double> seed_rad;
+  state.copyJointGroupPositions(group, seed_rad);
   if (!domain::validate(target).empty() || target.pose.frame_id != robot.modelFrame()) {
     return {sample_index, false, {}, FailureReason::kInvalidTarget};
   }

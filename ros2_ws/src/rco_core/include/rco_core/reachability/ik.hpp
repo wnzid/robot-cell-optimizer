@@ -5,6 +5,7 @@
 #include "rco_core/robot_model_context.hpp"
 
 #include <cstddef>
+#include <moveit/robot_state/robot_state.hpp>
 #include <vector>
 
 namespace rco_core::reachability {
@@ -20,6 +21,14 @@ namespace rco_core::reachability {
 [[nodiscard]] SampleResult solveSeededIk(const RobotModelContext& robot,
                                          const domain::TargetPose& target,
                                          const std::vector<double>& seed_rad,
+                                         std::size_t sample_index);
+
+// Uses a caller-supplied state as the seed and context for all robot variables.
+// The state must share robot.robotModel() and satisfy finite-value/joint bounds
+// checks. It is copied, never mutated; attached bodies and other joints survive.
+[[nodiscard]] SampleResult solveSeededIk(const RobotModelContext& robot,
+                                         const domain::TargetPose& target,
+                                         const moveit::core::RobotState& seed_state,
                                          std::size_t sample_index);
 
 } // namespace rco_core::reachability

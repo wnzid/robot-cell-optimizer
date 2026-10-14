@@ -4,13 +4,17 @@
 #include "rco_core/reachability/result.hpp"
 #include "rco_core/reachability/seed.hpp"
 #include "rco_core/robot_model_context.hpp"
+#include "rco_core/scene/collision_object.hpp"
+#include "rco_core/scene/planning_scene.hpp"
 
 #include <Eigen/Geometry>
 #include <cstddef>
 #include <gtest/gtest.h>
 #include <limits>
 #include <memory>
+#include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit/robot_state/robot_state.hpp>
+#include <moveit_msgs/msg/planning_scene.hpp>
 #include <rclcpp/node.hpp>
 #include <stdexcept>
 #include <vector>
@@ -228,6 +232,160 @@ TEST(SeededPathTest, RejectsEmptyPathAndInvalidStepLimits) {
   expectInvalidPath(robot, targets, -0.1);
   expectInvalidPath(robot, targets, std::numeric_limits<double>::infinity());
   expectInvalidPath(robot, targets, std::numeric_limits<double>::quiet_NaN());
+}
+
+rco_core::domain::CellEntity obstacleAt(const TargetPose& target, double size) {
+  rco_core::domain::CellEntity obstacle;
+  obstacle.id = "test_obstacle";
+  obstacle.pose = target.pose;
+  obstacle.geometry.type = rco_core::domain::GeometryType::kBox;
+  obstacle.geometry.size_m = {size, size, size};
+  return obstacle;
+}
+
+void expectCollision(const SampleResult& result) {
+  EXPECT_FALSE(result.reachable);
+  EXPECT_EQ(result.failure_reason, FailureReason::kCollision);
+  EXPECT_FALSE(result.joint_positions_rad.empty());
+  EXPECT_TRUE(rco_core::reachability::validate(result).empty());
+}
+
+TEST(SceneReachabilityTest, AcceptsClearSceneAndPreservesSceneSnapshot) {
+  const auto robot = makeRobot();
+  const planning_scene::PlanningScene scene(robot.robotModel());
+  const auto target = targetFromJoints(robot, referenceJoints());
+  moveit_msgs::msg::PlanningScene before;
+  scene.getPlanningSceneMsg(before);
+
+  const auto results = rco_core::reachability::solveSeededPath(robot, scene, {target, target},
+                                                               referenceJoints(), 0.2);
+
+  ASSERT_EQ(results.size(), 2U);
+  EXPECT_TRUE(results.front().reachable);
+  EXPECT_TRUE(results.back().reachable);
+  moveit_msgs::msg::PlanningScene after;
+  scene.getPlanningSceneMsg(after);
+  EXPECT_EQ(after, before);
+}
+
+TEST(SceneReachabilityTest, RejectsWorldCollisionAndHonorsAllowedCollisionMatrix) {
+  const auto robot = makeRobot();
+  planning_scene::PlanningScene scene(robot.robotModel());
+  const auto target = targetFromJoints(robot, referenceJoints());
+  ASSERT_TRUE(scene.processCollisionObjectMsg(
+      rco_core::scene::makeCollisionObject(obstacleAt(target, 0.3))));
+
+  const auto blocked =
+      rco_core::reachability::solveSeededPath(robot, scene, {target}, referenceJoints(), 0.2);
+  expectCollision(blocked.front());
+
+  scene.getAllowedCollisionMatrixNonConst().setEntry("test_obstacle", true);
+  const auto allowed =
+      rco_core::reachability::solveSeededPath(robot, scene, {target}, referenceJoints(), 0.2);
+  EXPECT_TRUE(allowed.front().reachable);
+}
+
+TEST(SceneReachabilityTest, RejectsCollidingAttachedTool) {
+  const auto robot = makeRobot();
+  planning_scene::PlanningScene scene(robot.robotModel());
+  const auto target = targetFromJoints(robot, referenceJoints());
+  auto obstacle = obstacleAt(target, 0.02);
+  obstacle.pose.position.z += 0.23;
+  ASSERT_TRUE(scene.processCollisionObjectMsg(rco_core::scene::makeCollisionObject(obstacle)));
+  const auto without_tool =
+      rco_core::reachability::solveSeededPath(robot, scene, {target}, referenceJoints(), 0.2);
+  ASSERT_TRUE(without_tool.front().reachable);
+
+  rco_core::domain::ToolDefinition tool;
+  tool.id = "test_tool";
+  tool.name = "large_test_tool";
+  tool.tcp.frame_id = "tool0";
+  rco_core::domain::GeometryDefinition sphere;
+  sphere.type = rco_core::domain::GeometryType::kSphere;
+  sphere.radius_m = 0.25;
+  tool.geometry.push_back(sphere);
+  ASSERT_TRUE(
+      rco_core::scene::applyAttachedTool(scene, tool, robot.robotModel()->getLinkModelNames()));
+
+  const auto with_tool =
+      rco_core::reachability::solveSeededPath(robot, scene, {target}, referenceJoints(), 0.2);
+  expectCollision(with_tool.front());
+}
+
+TEST(SceneReachabilityTest, RejectsSceneWithDifferentRobotModelInstance) {
+  const auto robot = makeRobot();
+  const auto other_robot = makeRobot();
+  const planning_scene::PlanningScene other_scene(other_robot.robotModel());
+  const auto target = targetFromJoints(robot, referenceJoints());
+  EXPECT_THROW(static_cast<void>(rco_core::reachability::solveSeededPath(
+                   robot, other_scene, {target}, referenceJoints(), 0.2)),
+               std::invalid_argument);
+}
+
+TEST(SceneReachabilityTest, RejectsWrongSizedSeedBeforeSettingRobotState) {
+  const auto robot = makeRobot();
+  const planning_scene::PlanningScene scene(robot.robotModel());
+  const auto target = targetFromJoints(robot, referenceJoints());
+  EXPECT_THROW(static_cast<void>(
+                   rco_core::reachability::solveSeededPath(robot, scene, {target}, {0.0}, 0.2)),
+               std::invalid_argument);
+}
+
+TEST(SceneReachabilityTest, RetainsLastAcceptedSeedAcrossWorldCollision) {
+  const auto robot = makeRobot();
+  planning_scene::PlanningScene scene(robot.robotModel());
+  auto joints = referenceJoints();
+  const auto clear_target = targetFromJoints(robot, joints);
+  joints.front() += 0.7;
+  const auto blocked_target = targetFromJoints(robot, joints);
+  ASSERT_TRUE(scene.processCollisionObjectMsg(
+      rco_core::scene::makeCollisionObject(obstacleAt(blocked_target, 0.08))));
+
+  const auto results = rco_core::reachability::solveSeededPath(
+      robot, scene, {clear_target, blocked_target, clear_target}, referenceJoints(), 1.0);
+
+  ASSERT_EQ(results.size(), 3U);
+  ASSERT_TRUE(results.front().reachable);
+  expectCollision(results[1]);
+  EXPECT_EQ(results.back(),
+            solveSeededIk(robot, clear_target, results.front().joint_positions_rad, 2U));
+}
+
+TEST(SceneReachabilityTest, RejectsAttachedToolSelfCollisionWithoutWorldObstacles) {
+  const auto robot = makeRobot();
+  planning_scene::PlanningScene scene(robot.robotModel());
+  rco_core::domain::ToolDefinition tool;
+  tool.id = "oversized_tool";
+  tool.name = "self_collision_fixture";
+  tool.tcp.frame_id = "tool0";
+  rco_core::domain::GeometryDefinition sphere;
+  sphere.type = rco_core::domain::GeometryType::kSphere;
+  sphere.radius_m = 1.0;
+  tool.geometry.push_back(sphere);
+  ASSERT_TRUE(rco_core::scene::applyAttachedTool(scene, tool, {"tool0"}));
+  const auto target = targetFromJoints(robot, referenceJoints());
+
+  const auto results =
+      rco_core::reachability::solveSeededPath(robot, scene, {target}, referenceJoints(), 0.2);
+
+  expectCollision(results.front());
+}
+
+TEST(SeededIkStateTest, RejectsStateFromDifferentRobotModel) {
+  const auto robot = makeRobot();
+  const auto other_robot = makeRobot();
+  const auto target = targetFromJoints(robot, referenceJoints());
+  const auto other_state = other_robot.makeDefaultState();
+  EXPECT_THROW(static_cast<void>(solveSeededIk(robot, target, other_state, 0U)),
+               std::invalid_argument);
+}
+
+TEST(SeededIkStateTest, RejectsNonFiniteContextState) {
+  const auto robot = makeRobot();
+  const auto target = targetFromJoints(robot, referenceJoints());
+  auto state = robot.makeDefaultState();
+  state.setVariablePosition("shoulder_pan_joint", std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(static_cast<void>(solveSeededIk(robot, target, state, 0U)), std::invalid_argument);
 }
 
 } // namespace
