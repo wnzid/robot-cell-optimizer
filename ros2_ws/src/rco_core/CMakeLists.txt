@@ -51,6 +51,7 @@ add_library(rco_core
   src/reachability/result.cpp
   src/reachability/seed.cpp
   src/reachability/ik.cpp
+  src/reachability/path.cpp
   src/task/path.cpp
   src/task/visualization.cpp
   src/scene/collision_object.cpp

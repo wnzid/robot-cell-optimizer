@@ -1,10 +1,12 @@
 #include "rco_core/domain/model.hpp"
 #include "rco_core/reachability/ik.hpp"
+#include "rco_core/reachability/path.hpp"
 #include "rco_core/reachability/result.hpp"
 #include "rco_core/reachability/seed.hpp"
 #include "rco_core/robot_model_context.hpp"
 
 #include <Eigen/Geometry>
+#include <cstddef>
 #include <gtest/gtest.h>
 #include <limits>
 #include <memory>
@@ -153,6 +155,79 @@ TEST(SeededIkTest, RejectsNonFiniteAndOutOfBoundsSeeds) {
 TEST(SeededIkTest, RejectsTcpThatDoesNotMatchSolverTip) {
   const auto robot = makeRobot("wrist_3_link");
   expectInvalidSeed(robot, referenceJoints());
+}
+
+TEST(SeededPathTest, EvaluatesOrderedTargetsAndRepeatsIdentically) {
+  const auto robot = makeRobot();
+  auto joints = referenceJoints();
+  const auto first = targetFromJoints(robot, joints);
+  joints.front() += 0.04;
+  const std::vector<TargetPose> targets{first, targetFromJoints(robot, joints), first};
+
+  const auto results =
+      rco_core::reachability::solveSeededPath(robot, targets, referenceJoints(), 0.2);
+
+  ASSERT_EQ(results.size(), targets.size());
+  for (std::size_t index = 0; index < results.size(); ++index) {
+    ASSERT_TRUE(results[index].reachable);
+    EXPECT_EQ(results[index].sample_index, index);
+    expectPoseMatches(targetFromJoints(robot, results[index].joint_positions_rad), targets[index]);
+  }
+  EXPECT_EQ(rco_core::reachability::solveSeededPath(robot, targets, referenceJoints(), 0.2),
+            results);
+}
+
+TEST(SeededPathTest, RetainsAcceptedSeedAcrossInvalidAndUnreachableSamples) {
+  const auto robot = makeRobot();
+  const auto valid = targetFromJoints(robot, referenceJoints());
+  auto invalid = valid;
+  invalid.pose.frame_id = "unresolved_workpiece";
+  auto unreachable = valid;
+  unreachable.pose.position.x = 100.0;
+
+  const auto results = rco_core::reachability::solveSeededPath(
+      robot, {valid, invalid, unreachable, valid}, referenceJoints(), 0.2);
+
+  ASSERT_EQ(results.size(), 4U);
+  ASSERT_TRUE(results.front().reachable);
+  expectFailure(results[1], FailureReason::kInvalidTarget);
+  expectFailure(results[2], FailureReason::kIkFailed);
+  EXPECT_EQ(results.back(), solveSeededIk(robot, valid, results.front().joint_positions_rad, 3U));
+}
+
+TEST(SeededPathTest, RejectsJointJumpAndRecoversFromLastAcceptedSeed) {
+  const auto robot = makeRobot();
+  auto joints = referenceJoints();
+  const auto first = targetFromJoints(robot, joints);
+  joints.front() += 0.1;
+  const auto jumped = targetFromJoints(robot, joints);
+
+  const auto results = rco_core::reachability::solveSeededPath(robot, {first, jumped, first},
+                                                               referenceJoints(), 0.001);
+
+  ASSERT_EQ(results.size(), 3U);
+  ASSERT_TRUE(results.front().reachable);
+  EXPECT_FALSE(results[1].reachable);
+  EXPECT_EQ(results[1].failure_reason, FailureReason::kDiscontinuity);
+  EXPECT_FALSE(results[1].joint_positions_rad.empty());
+  EXPECT_EQ(results.back(), solveSeededIk(robot, first, results.front().joint_positions_rad, 2U));
+}
+
+void expectInvalidPath(const rco_core::RobotModelContext& robot,
+                       const std::vector<TargetPose>& targets, double limit) {
+  EXPECT_THROW(static_cast<void>(rco_core::reachability::solveSeededPath(robot, targets,
+                                                                         referenceJoints(), limit)),
+               std::invalid_argument);
+}
+
+TEST(SeededPathTest, RejectsEmptyPathAndInvalidStepLimits) {
+  const auto robot = makeRobot();
+  const std::vector<TargetPose> targets{targetFromJoints(robot, referenceJoints())};
+  expectInvalidPath(robot, {}, 0.2);
+  expectInvalidPath(robot, targets, 0.0);
+  expectInvalidPath(robot, targets, -0.1);
+  expectInvalidPath(robot, targets, std::numeric_limits<double>::infinity());
+  expectInvalidPath(robot, targets, std::numeric_limits<double>::quiet_NaN());
 }
 
 } // namespace

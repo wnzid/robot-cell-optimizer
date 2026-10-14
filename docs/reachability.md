@@ -43,6 +43,24 @@ or full manufacturing-task feasibility result.
 from reachable results and keeps the last accepted seed across failures. Its
 reset method restores the caller's initial seed.
 
+## Ordered paths
+
+`solveSeededPath` evaluates a nonempty vector of targets in order, returning one
+indexed result per target. The initial seed is used for the first sample; only
+accepted solutions become seeds for later samples. Failed samples remain in the
+output, and evaluation continues from the last accepted seed.
+
+The caller supplies a finite positive maximum joint step in radians. Any joint
+whose absolute displacement from the seed exceeds that limit causes a
+`DISCONTINUITY` result. The candidate joint solution is retained for diagnostics,
+but does not become the next seed. This rule also applies to the first sample's
+displacement from the initial seed. Joint coordinates are compared without
+modulo-2-pi wrapping so a change of winding is not silently accepted.
+
+This is a kinematic path check, not a continuous collision check or trajectory
+planner. Later successes do not erase earlier failures; downstream feasibility
+evaluation must account for every mandatory sample.
+
 ## Verification
 
 Real UR5e/KDL fixtures cover nearby reachable targets, a far-away unreachable
