@@ -50,6 +50,7 @@ add_library(rco_core
   src/domain/validation.cpp
   src/reachability/result.cpp
   src/reachability/seed.cpp
+  src/reachability/ik.cpp
   src/task/path.cpp
   src/task/visualization.cpp
   src/scene/collision_object.cpp
@@ -265,6 +266,7 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_robot_model_context
     test/test_robot_model_context.cpp
+    test/reachability/test_ik.cpp
     SKIP_TEST
   )
 
