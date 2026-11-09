@@ -49,6 +49,7 @@ add_library(rco_core
   src/domain/serialization.cpp
   src/domain/validation.cpp
   src/reachability/result.cpp
+  src/reachability/path.cpp
   src/reachability/seed.cpp
   src/task/path.cpp
   src/task/visualization.cpp
@@ -189,6 +190,14 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(test_reachability_seed
+    rco_core
+  )
+
+  ament_add_gtest(test_reachability_path
+    test/reachability/test_path.cpp
+  )
+
+  target_link_libraries(test_reachability_path
     rco_core
   )
 
