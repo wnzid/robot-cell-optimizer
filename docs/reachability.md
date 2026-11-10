@@ -99,3 +99,24 @@ cd ros2_ws
 colcon test --packages-select rco_core --ctest-args -R test_test_robot_model_context_launch.py
 colcon test-result --verbose
 ```
+
+## Sampled path summaries
+
+`rco_core::reachability::summarizePath` accepts the sample results returned by
+`solveSeededPath`. It reports the sample count, reachable count, fraction in
+[0, 1], failure counts by reason, and whether every sample is reachable.
+Empty input has no fraction and does not count as fully reachable. Invalid
+sample results and duplicate sample indices throw `std::invalid_argument`;
+unique indices may be supplied in any order. The summary describes only the
+supplied discrete samples, not continuous trajectory feasibility.
+
+The standalone `test_reachability_summary` target covers aggregation, empty
+input, malformed results, and duplicate indices. Run it after building:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ros2_ws/install/setup.bash
+cd ros2_ws
+colcon test --packages-select rco_core --ctest-args -R test_reachability_summary
+colcon test-result --verbose
+```
