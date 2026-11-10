@@ -85,6 +85,8 @@ TEST(ReachabilitySummaryTest, CountsEverySupportedFailureReason) {
 TEST(ReachabilitySummaryTest, RejectsNonFiniteJointsAndUnsupportedReason) {
   const SampleResult nonfinite{0U, true, {std::numeric_limits<double>::infinity()}, std::nullopt};
   EXPECT_THROW(static_cast<void>(summarizePath({nonfinite})), std::invalid_argument);
+  // Deliberately construct an unsupported value to exercise runtime validation.
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   const SampleResult unsupported{0U, false, {}, static_cast<FailureReason>(99)};
   EXPECT_THROW(static_cast<void>(summarizePath({unsupported})), std::invalid_argument);
 }
