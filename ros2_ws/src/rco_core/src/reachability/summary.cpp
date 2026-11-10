@@ -3,6 +3,7 @@
 #include "rco_core/reachability/result.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -23,8 +24,10 @@ PathSummary summarizePath(const std::vector<SampleResult>& results) {
     }
     if (result.reachable) {
       ++summary.reachable_count;
-    } else {
+    } else if (result.failure_reason.has_value()) {
       ++summary.failure_counts[result.failure_reason.value()];
+    } else {
+      throw std::invalid_argument("Unreachable sample must provide a failure reason.");
     }
   }
 
