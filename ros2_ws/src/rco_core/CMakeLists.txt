@@ -52,6 +52,7 @@ add_library(rco_core
   src/reachability/seed.cpp
   src/reachability/ik.cpp
   src/reachability/path.cpp
+  src/kinematics/joint_margin.cpp
   src/task/path.cpp
   src/task/visualization.cpp
   src/scene/collision_object.cpp
@@ -201,6 +202,11 @@ if(BUILD_TESTING)
   target_link_libraries(test_task_path
     rco_core
   )
+
+  ament_add_gtest(test_joint_margin
+    test/kinematics/test_joint_margin.cpp
+  )
+  target_link_libraries(test_joint_margin rco_core)
 
   ament_add_gtest(test_task_visualization
     test/task/test_visualization.cpp
