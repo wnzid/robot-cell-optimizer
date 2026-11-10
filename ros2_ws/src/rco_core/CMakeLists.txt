@@ -54,6 +54,8 @@ add_library(rco_core
   src/reachability/path.cpp
   src/reachability/summary.cpp
   src/kinematics/joint_margin.cpp
+  src/kinematics/quality.cpp
+  src/kinematics/robot_quality.cpp
   src/task/path.cpp
   src/task/visualization.cpp
   src/scene/collision_object.cpp
@@ -212,6 +214,11 @@ if(BUILD_TESTING)
     rco_core
   )
 
+  ament_add_gtest(test_kinematic_quality
+    test/kinematics/test_quality.cpp
+  )
+  target_link_libraries(test_kinematic_quality rco_core)
+
   ament_add_gtest(test_joint_margin
     test/kinematics/test_joint_margin.cpp
   )
@@ -283,6 +290,7 @@ if(BUILD_TESTING)
   ament_add_gtest(test_robot_model_context
     test/test_robot_model_context.cpp
     test/reachability/test_ik.cpp
+    test/kinematics/test_robot_quality.cpp
     SKIP_TEST
   )
 
