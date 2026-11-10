@@ -34,9 +34,9 @@ TEST(ReachabilitySummaryTest, FullyReachablePath) {
 
 TEST(ReachabilitySummaryTest, CountsMixedFailuresWithoutLosingReasons) {
   const auto summary = summarizePath({{0U, true, {0.1}, std::nullopt},
-                                     {1U, false, {}, FailureReason::kIkFailed},
-                                     {2U, false, {}, FailureReason::kDiscontinuity},
-                                     {3U, false, {}, FailureReason::kIkFailed}});
+                                      {1U, false, {}, FailureReason::kIkFailed},
+                                      {2U, false, {}, FailureReason::kDiscontinuity},
+                                      {3U, false, {}, FailureReason::kIkFailed}});
   EXPECT_EQ(summary.sample_count, 4U);
   EXPECT_EQ(summary.reachable_count, 1U);
   EXPECT_EQ(summary.reachable_fraction, 0.25);

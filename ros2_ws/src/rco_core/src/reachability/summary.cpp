@@ -32,8 +32,8 @@ PathSummary summarizePath(const std::vector<SampleResult>& results) {
   }
 
   if (!results.empty()) {
-    summary.reachable_fraction = static_cast<double>(summary.reachable_count) /
-                                 static_cast<double>(summary.sample_count);
+    summary.reachable_fraction =
+        static_cast<double>(summary.reachable_count) / static_cast<double>(summary.sample_count);
     summary.fully_reachable = summary.reachable_count == summary.sample_count;
   }
   return summary;
